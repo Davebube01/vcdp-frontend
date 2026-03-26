@@ -51,7 +51,7 @@ export default function RecordDetails() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/records")}
+            onClick={() => navigate("/submissions")}
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>

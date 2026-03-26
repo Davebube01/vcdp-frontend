@@ -42,8 +42,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "Records", icon: Table, href: "/records" },
-    { label: "New Record", icon: PlusCircle, href: "/records/new" },
+    { label: "Submissions", icon: Table, href: "/submissions" },
+    { label: "New Submission", icon: PlusCircle, href: "/submissions/new" },
     { label: "Documents", icon: FolderSearch, href: "/documents" },
     ...(user?.role?.toUpperCase() === "NATIONAL_ADMIN"
       ? [{ label: "Users", icon: UsersIcon, href: "/users" }]
@@ -119,7 +119,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => {
                   localStorage.removeItem("auth_token");
                   localStorage.removeItem("auth_user");
-                  window.location.href = "/login";
+                  window.location.href = "/";
                 }}
               >
                 <LogOut className="w-4 h-4" />

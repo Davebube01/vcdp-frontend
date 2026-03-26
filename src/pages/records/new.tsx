@@ -5,6 +5,7 @@ import * as z from "zod";
 import { useInsight } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Form,
   FormControl,
@@ -41,51 +42,124 @@ import {
   useValueChainSegments,
 } from "@/core/services/loaders/meta-loaders";
 import { useCreateRecordAction } from "@/core/services/actions/record-actions";
+import { useDocuments } from "@/core/services/loaders/documents-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Save, FileCheck } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2, Save, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/providers/AuthProvider";
 
-const formSchema = z.object({
-  ref_id: z.string().min(1, "Ref ID is required"),
-  project_name: z.string().min(1, "Project Name is required"),
-  commodity: z.array(z.string()).min(1, "At least one commodity required"),
-  fy_awarded: z.string().min(1, "FY Awarded is required"),
-  fy_completed: z.string().min(1, "FY Completed is required"),
-  programme_phase: z.string(),
-  fiscal_quarter: z.string().min(1, "Fiscal Quarter is required"),
-  vcdp_component: z.string().min(1, "VCDP Component is required"),
-  vcdp_sub_components: z
-    .array(z.string())
-    .min(1, "At least one sub-component required"),
-  state: z.string().min(1, "State is required"),
-  lgas: z.array(z.string()).min(1, "At least one LGA required"),
-  threeFS_primary: z
-    .array(z.string())
-    .min(1, "At least one 3FS Primary required"),
-  threeFS_sub_components: z.array(z.string()),
-  cofog_code: z.string(),
-  funding_sources: z
-    .array(z.string())
-    .min(1, "At least one funding source required"),
-  expenditure_fgn: z.coerce.number().min(0),
-  expenditure_state: z.coerce.number().min(0),
-  expenditure_ifad: z.coerce.number().min(0),
-  expenditure_oof: z.coerce.number().min(0),
-  expenditure_beneficiary: z.coerce.number().min(0),
-  expenditure_other: z.coerce.number().min(0),
-  beneficiary_categories: z.array(z.string()),
-  beneficiary_total: z.coerce.number().min(0),
-  beneficiary_male: z.coerce.number().min(0),
-  beneficiary_female: z.coerce.number().min(0),
-  beneficiary_youth_under35: z.coerce.number().min(0),
-  value_chain_segments: z.array(z.string()),
-  climate_flag: z.boolean(),
-  data_source: z.string().min(1, "Data Source is required"),
-  supporting_documents: z.array(z.string()),
-  classification_notes: z.string().max(200).optional(),
-});
+const formSchema = z
+  .object({
+    ref_id: z.string().min(1, "Ref ID is required"),
+    project_name: z.string().min(1, "Project Name is required"),
+    commodity: z.array(z.string()).min(1, "At least one commodity required"),
+    fy_awarded: z.string().min(1, "FY Awarded is required"),
+    fy_completed: z.string().min(1, "FY Completed is required"),
+    programme_phase: z.string(),
+    fiscal_quarter: z.string().min(1, "Fiscal Quarter is required"),
+    vcdp_component: z.string().min(1, "VCDP Component is required"),
+    vcdp_sub_components: z
+      .array(z.string())
+      .min(1, "At least one sub-component required"),
+    state: z.string().min(1, "State is required"),
+    lgas: z.array(z.string()).min(1, "At least one LGA required"),
+    threeFS_primary: z
+      .array(z.string())
+      .min(1, "At least one 3FS Primary required"),
+    threeFS_sub_components: z.array(z.string()),
+    cofog_code: z.string().optional(),
+    funding_sources: z
+      .array(z.string())
+      .min(1, "At least one funding source required"),
+    sub_funding_sources: z.array(z.string()),
+    expenditure_fgn: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_state: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_ifad: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_oof: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_beneficiary: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_other: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_total_reported: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    beneficiary_categories: z.array(z.string()),
+    beneficiary_total: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    beneficiary_male: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    beneficiary_female: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    beneficiary_youth_under35: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    value_chain_segments: z.array(z.string()),
+    climate_flag: z.boolean(),
+    data_source: z
+      .array(z.string())
+      .min(1, "At least one Data Source required"),
+    supporting_documents: z.array(z.string()),
+    classification_notes: z.string().max(200).optional(),
+  })
+  .refine(
+    (data) => {
+      const fy_completed = parseInt(data.fy_completed);
+      const fy_awarded = parseInt(data.fy_awarded);
+      return fy_completed >= fy_awarded;
+    },
+    {
+      message: "FY Completed cannot be before FY Awarded",
+      path: ["fy_completed"],
+    },
+  )
+  .refine(
+    (data) => {
+      return (
+        data.beneficiary_male + data.beneficiary_female ===
+        data.beneficiary_total
+      );
+    },
+    {
+      message: "Male + Female headcount must equal Total Headcount",
+      path: ["beneficiary_total"],
+    },
+  )
+  .refine(
+    (data) => {
+      return data.beneficiary_youth_under35 <= data.beneficiary_total;
+    },
+    {
+      message: "Youth headcount cannot exceed Total Headcount",
+      path: ["beneficiary_youth_under35"],
+    },
+  );
 
 export default function NewRecord() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -103,37 +177,39 @@ export default function NewRecord() {
   const { data: segments } = useValueChainSegments();
 
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       ref_id: "",
       project_name: "",
       commodity: [],
       fy_awarded: "",
       fy_completed: "",
-      programme_phase: "",
+      programme_phase: "VCDP Phase II",
       fiscal_quarter: "",
       vcdp_component: "",
       vcdp_sub_components: [],
-      state: !isNationalAdmin ? user?.state || "" : "",
+      state: isNationalAdmin ? "" : user?.state || "",
       lgas: [],
       threeFS_primary: [],
       threeFS_sub_components: [],
       cofog_code: "",
       funding_sources: [],
-      expenditure_fgn: 0,
-      expenditure_state: 0,
-      expenditure_ifad: 0,
-      expenditure_oof: 0,
-      expenditure_beneficiary: 0,
-      expenditure_other: 0,
+      sub_funding_sources: [],
+      expenditure_fgn: "" as any,
+      expenditure_state: "" as any,
+      expenditure_ifad: "" as any,
+      expenditure_oof: "" as any,
+      expenditure_beneficiary: "" as any,
+      expenditure_other: "" as any,
+      expenditure_total_reported: "" as any,
       beneficiary_categories: [],
-      beneficiary_total: 0,
-      beneficiary_male: 0,
-      beneficiary_female: 0,
-      beneficiary_youth_under35: 0,
+      beneficiary_total: "" as any,
+      beneficiary_male: "" as any,
+      beneficiary_female: "" as any,
+      beneficiary_youth_under35: "" as any,
       value_chain_segments: [],
       climate_flag: false,
-      data_source: "",
+      data_source: [],
       supporting_documents: [],
       classification_notes: "",
     },
@@ -164,6 +240,36 @@ export default function NewRecord() {
       form.setValue("programme_phase", "2nd AF");
     }
   }, [watchedValues.fy_awarded, form]);
+
+  // Logic: Beneficiary Auto-population
+  useEffect(() => {
+    const total = Number(watchedValues.beneficiary_total) || 0;
+    const male = Number(watchedValues.beneficiary_male) || 0;
+    const female = Number(watchedValues.beneficiary_female) || 0;
+
+    // Use a ref-like check or just ensure we don't trigger infinite loops
+    // react-hook-form's setValue with shouldValidate: true might trigger re-renders
+    if (total > 0) {
+      if (document.activeElement?.getAttribute("name") === "beneficiary_male") {
+        const calculatedFemale = Math.max(0, total - male);
+        if (female !== calculatedFemale) {
+          form.setValue("beneficiary_female", calculatedFemale);
+        }
+      } else if (
+        document.activeElement?.getAttribute("name") === "beneficiary_female"
+      ) {
+        const calculatedMale = Math.max(0, total - female);
+        if (male !== calculatedMale) {
+          form.setValue("beneficiary_male", calculatedMale);
+        }
+      }
+    }
+  }, [
+    watchedValues.beneficiary_total,
+    watchedValues.beneficiary_male,
+    watchedValues.beneficiary_female,
+    form,
+  ]);
 
   // Logic: Expenditure Total (Display only)
   const totalExpenditure = useMemo(() => {
@@ -197,6 +303,44 @@ export default function NewRecord() {
     );
   }, [watchedValues.vcdp_component, vcdpMeta]);
 
+  // Logic: Dynamic Supporting Documents
+  const { data: allDocs } = useDocuments(watchedValues.state);
+  const availableDocuments = useMemo(() => {
+    if (
+      !allDocs ||
+      !watchedValues.data_source ||
+      watchedValues.data_source.length === 0
+    )
+      return [];
+
+    // Show documents that match the selected state and ANY of the selected data sources
+    return allDocs
+      .filter((doc: any) =>
+        watchedValues.data_source?.includes(doc.data_source),
+      )
+      .map((doc: any) => doc.name);
+  }, [allDocs, watchedValues.data_source]);
+
+  // Logic: Filtered 3FS Sub-Components
+  const filteredThreeFsSubs = useMemo(() => {
+    const selectedPrimaries = watchedValues.threeFS_primary || [];
+    if (selectedPrimaries.length === 0) return [];
+
+    return selectedPrimaries.flatMap(
+      (primary) => (threeFsMeta as Record<string, string[]>)?.[primary] || [],
+    );
+  }, [watchedValues.threeFS_primary, threeFsMeta]);
+
+  // Logic: Filtered Sub-Funding Sources
+  const filteredSubFundingSources = useMemo(() => {
+    const selectedFoundations = watchedValues.funding_sources || [];
+    if (selectedFoundations.length === 0) return [];
+
+    return selectedFoundations.flatMap(
+      (source) => (fundMeta as Record<string, string[]>)?.[source] || [],
+    );
+  }, [watchedValues.funding_sources, fundMeta]);
+
   const createRecordMutation = useCreateRecordAction();
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -222,7 +366,7 @@ export default function NewRecord() {
           title: "Success",
           description: "Transaction record saved successfully.",
         });
-        navigate("/records");
+        navigate("/submissions");
       },
       onError: (error: any) => {
         toast({
@@ -249,10 +393,10 @@ export default function NewRecord() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-display font-bold text-primary tracking-tight">
-            New Transaction Entry
+            New 3FS Record
           </h2>
           <p className="text-muted-foreground mt-1 font-medium italic">
-            Single Source of Truth (2013-2025)
+            Project Year
           </p>
         </div>
         <div className="hidden md:block">
@@ -284,7 +428,7 @@ export default function NewRecord() {
                 name="ref_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ref ID / Transaction ID</FormLabel>
+                    <FormLabel>Project Reference Number/Transaction ID </FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. VCDP/LGA/2024/001" {...field} />
                     </FormControl>
@@ -297,12 +441,9 @@ export default function NewRecord() {
                 name="project_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Name / Description</FormLabel>
+                    <FormLabel>Project Name/Specific Activity Name </FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="e.g. Market Development"
-                        {...field}
-                      />
+                      <Input placeholder="e.g. Market Development" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -313,7 +454,7 @@ export default function NewRecord() {
                 name="commodity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commodity</FormLabel>
+                    <FormLabel>Commodity Value Chain</FormLabel>
                     <FormControl>
                       <MultiSelect
                         options={commodities || []}
@@ -331,25 +472,58 @@ export default function NewRecord() {
                   control={form.control}
                   name="fy_awarded"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>FY Awarded</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="bg-muted/10">
-                            <SelectValue placeholder="Year" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {years?.map((y) => (
-                            <SelectItem key={y} value={y.toString()}>
-                              {y}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Fiscal Year (Awarded)</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between bg-muted/10",
+                                !field.value && "text-muted-foreground",
+                              )}
+                            >
+                              {field.value
+                                ? years?.find(
+                                    (y) => y.toString() === field.value,
+                                  )
+                                : "Select Year"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search year..." />
+                            <CommandList>
+                              <CommandEmpty>No year found.</CommandEmpty>
+                              <CommandGroup>
+                                {years?.map((y) => (
+                                  <CommandItem
+                                    value={y.toString()}
+                                    key={y}
+                                    onSelect={() => {
+                                      form.setValue("fy_awarded", y.toString());
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        y.toString() === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    {y}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -359,24 +533,66 @@ export default function NewRecord() {
                   name="fy_completed"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>FY Completed</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="bg-muted/10">
-                            <SelectValue placeholder="Year" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {years?.map((y) => (
-                            <SelectItem key={y} value={y.toString()}>
-                              {y}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Fiscal Year (Completed)</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between bg-muted/10",
+                                !field.value && "text-muted-foreground",
+                              )}
+                            >
+                              {field.value
+                                ? years?.find(
+                                    (y) => y.toString() === field.value,
+                                  )
+                                : "Select Year"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search year..." />
+                            <CommandList>
+                              <CommandEmpty>No year found.</CommandEmpty>
+                              <CommandGroup>
+                                {years
+                                  ?.filter(
+                                    (y) =>
+                                      !watchedValues.fy_awarded ||
+                                      y >= parseInt(watchedValues.fy_awarded),
+                                  )
+                                  .map((y) => (
+                                    <CommandItem
+                                      value={y.toString()}
+                                      key={y}
+                                      onSelect={() => {
+                                        form.setValue(
+                                          "fy_completed",
+                                          y.toString(),
+                                        );
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          y.toString() === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                      {y}
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -501,7 +717,7 @@ export default function NewRecord() {
                   name="threeFS_primary"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>3FS Primary Component(s)</FormLabel>
+                      <FormLabel>3FS Component (Primary) </FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={threeFsMeta ? Object.keys(threeFsMeta) : []}
@@ -519,15 +735,14 @@ export default function NewRecord() {
                   name="threeFS_sub_components"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>3FS Sub-Component(s)</FormLabel>
+                      <FormLabel>3FS Sub-Component</FormLabel>
                       <FormControl>
                         <MultiSelect
-                          options={
-                            threeFsMeta ? Object.values(threeFsMeta).flat() : []
-                          }
+                          options={filteredThreeFsSubs}
                           selected={field.value}
                           onChange={field.onChange}
                           placeholder="Select Sub 3FS"
+                          disabled={watchedValues.threeFS_primary?.length === 0}
                         />
                       </FormControl>
                       <FormMessage />
@@ -555,7 +770,7 @@ export default function NewRecord() {
                   name="state"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Implementation State</FormLabel>
+                      <FormLabel>Geographic Location (State)</FormLabel>
                       <Select
                         onValueChange={(val) => {
                           field.onChange(val);
@@ -593,7 +808,7 @@ export default function NewRecord() {
                   name="lgas"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Targeted LGA(s)</FormLabel>
+                      <FormLabel>Sub-geographic Location (LGAs)</FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={filteredLGAs}
@@ -601,23 +816,6 @@ export default function NewRecord() {
                           onChange={field.onChange}
                           placeholder="Select LGAs"
                           disabled={!watchedValues.state}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="value_chain_segments"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Value Chain Segment(s)</FormLabel>
-                      <FormControl>
-                        <MultiSelect
-                          options={segments || []}
-                          selected={field.value}
-                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -642,7 +840,7 @@ export default function NewRecord() {
                   name="funding_sources"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Primary Funding Source(s)</FormLabel>
+                      <FormLabel>Funding Source</FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={fundMeta ? Object.keys(fundMeta) : []}
@@ -656,33 +854,35 @@ export default function NewRecord() {
                 />
                 <FormField
                   control={form.control}
-                  name="data_source"
+                  name="sub_funding_sources"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Data Source</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Source" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[
-                            "Financial Report",
-                            "Audit Report",
-                            "Procurement Document",
-                            "M&E Field Report",
-                            "Other",
-                          ].map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Sub-Funding Source(s)</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={filteredSubFundingSources}
+                          selected={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Sub-Funding Source(s)"
+                          disabled={watchedValues.funding_sources?.length === 0}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cofog_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>COFOG Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 70421" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Classification of the Functions of Government
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -698,10 +898,47 @@ export default function NewRecord() {
                 <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm shadow-md">
                   5
                 </span>
-                Financial Expenditure (USD)
+                Grant Details (USD) 
               </h3>
             </div>
             <CardContent className="pt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="bg-slate-900 text-white rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">
+                      Allocated Budget
+                    </p>
+                    <p className="text-4xl font-display font-bold mt-1">
+                      $
+                      {totalExpenditure.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  {/* <div className="text-right">
+                    <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">
+                      <FileCheck className="w-4 h-4" /> Hard Validated
+                    </div>
+                  </div> */}
+                </div>
+
+                <div className="bg-slate-900 text-white rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl border-t-4 border-t-purple-500">
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">
+                      Total Expenditure (Reported)
+                    </p>
+                    <p className="text-4xl font-display font-bold mt-1 text-purple-400">
+                      $
+                      {(
+                        watchedValues.expenditure_total_reported || 0
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <FormField
                   control={form.control}
@@ -718,7 +955,18 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -740,7 +988,18 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -762,7 +1021,18 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -784,7 +1054,18 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -806,7 +1087,18 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -828,7 +1120,53 @@ export default function NewRecord() {
                         <Input
                           type="number"
                           {...field}
-                          className="text-lg font-mono"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expenditure_total_reported"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex justify-between text-purple-600 font-semibold">
+                        Total Expenditure (from Data Source){" "}
+                        <span className="text-[10px] text-muted-foreground uppercase">
+                          USD
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter total from document"
+                          className="border-purple-200 focus-visible:ring-purple-500"
+                          {...field}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -836,33 +1174,72 @@ export default function NewRecord() {
                   )}
                 />
               </div>
-              <div className="bg-slate-900 text-white rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
-                <div>
-                  <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">
-                    Grand Total Expenditure
-                  </p>
-                  <p className="text-4xl font-display font-bold mt-1">
-                    $
-                    {totalExpenditure.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">
-                    <FileCheck className="w-4 h-4" /> Hard Validated
-                  </div>
-                </div>
+            </CardContent>
+          </Card>
+
+          {/* SECTION 6: Value Chain & Data Sources */}
+          <Card className="glass-card shadow-sm border-l-4 border-l-indigo-500 relative z-50 overflow-visible">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs">
+                  6
+                </span>
+                Value Chain & Data Sources
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 overflow-visible">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="value_chain_segments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Value Chain Segment(s)</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={segments || []}
+                          selected={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="data_source"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data Source</FormLabel>
+                      <MultiSelect
+                        options={[
+                          "Financial report",
+                          "Audit report",
+                          "Procurement record",
+                          "Beneficiary database",
+                          "AWPB excerpts",
+                          "Bank statements",
+                          "Geographic/location data",
+                        ]}
+                        selected={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Select Source(s)"
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </CardContent>
           </Card>
 
-          {/* SECTION 5: Beneficiaries */}
-          <Card className="glass-card shadow-sm border-l-4 border-l-rose-500">
+          {/* SECTION 7: Beneficiaries */}
+          <Card className="glass-card shadow-sm border-l-4 border-l-rose-500 z-10">
             <CardHeader>
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs">
-                  6
+                  7
                 </span>
                 Beneficiary Data
               </CardTitle>
@@ -900,7 +1277,22 @@ export default function NewRecord() {
                     <FormItem>
                       <FormLabel>Total Headcount</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -913,7 +1305,22 @@ export default function NewRecord() {
                     <FormItem>
                       <FormLabel>Male</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -926,7 +1333,22 @@ export default function NewRecord() {
                     <FormItem>
                       <FormLabel>Female</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -939,7 +1361,22 @@ export default function NewRecord() {
                     <FormItem>
                       <FormLabel>Youth (&lt;35)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Strip leading zeros unless it's just "0"
+                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                            field.onChange(
+                              cleanVal === ""
+                                ? ""
+                                : val.startsWith("0") && val.length > 1
+                                  ? Number(cleanVal)
+                                  : val,
+                            );
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -949,10 +1386,13 @@ export default function NewRecord() {
             </CardContent>
           </Card>
 
-          {/* SECTION 6: Finalization */}
+          {/* SECTION 8: Finalization */}
           <Card className="glass-card shadow-sm border-l-4 border-l-gray-400">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-xs">
+                  8
+                </span>
                 Finalization & Logistics
               </CardTitle>
             </CardHeader>
@@ -1016,15 +1456,15 @@ export default function NewRecord() {
                       </FormLabel>
                       <FormControl>
                         <MultiSelect
-                          options={[
-                            "Financial Statement",
-                            "Audit Report",
-                            "Photographic Evidence",
-                            "Attendance List",
-                            "LGA Clearance",
-                          ]}
+                          options={availableDocuments}
                           selected={field.value}
                           onChange={field.onChange}
+                          placeholder={
+                            watchedValues.state &&
+                            (watchedValues.data_source?.length || 0) > 0
+                              ? "Select Documents"
+                              : "Select State & Data Source First"
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -1045,7 +1485,7 @@ export default function NewRecord() {
               <Button
                 variant="outline"
                 type="button"
-                onClick={() => navigate("/records")}
+                onClick={() => navigate("/submissions")}
                 disabled={isSubmitting}
               >
                 Cancel

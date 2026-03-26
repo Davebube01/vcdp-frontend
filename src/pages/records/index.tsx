@@ -218,7 +218,7 @@ export default function Records() {
       id: "actions",
       cell: ({ row }) => (
         <Button variant="ghost" size="icon" asChild>
-          <Link to={`/records/${row.original.id}`}>
+          <Link to={`/submissions/${row.original.id}`}>
             <ExternalLink className="w-4 h-4" />
           </Link>
         </Button>
@@ -244,7 +244,7 @@ export default function Records() {
             VCDP Submissions
           </h2>
           <p className="text-muted-foreground mt-1">
-            Manage and track all transaction records.
+            Manage and track all submission records.
           </p>
         </div>
         <div className="flex gap-3">
@@ -257,9 +257,9 @@ export default function Records() {
             <span className="hidden sm:inline">Export CSV</span>
           </Button>
           <Button asChild className="gap-2 shadow-lg shadow-primary/20">
-            <Link to="/records/new">
+            <Link to="/submissions/new">
               <Plus className="w-4 h-4" />
-              New Record
+              New Submission
             </Link>
           </Button>
         </div>

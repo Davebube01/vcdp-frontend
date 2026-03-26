@@ -469,7 +469,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold">
-              {metrics?.kpis.active_states} / 6
+              {metrics?.kpis.active_states}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
               Participating core states

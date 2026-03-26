@@ -26,9 +26,9 @@ function Router() {
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/records" element={<Records />} />
-              <Route path="/records/new" element={<NewRecord />} />
-              <Route path="/records/:id" element={<RecordDetails />} />
+              <Route path="/submissions" element={<Records />} />
+              <Route path="/submissions/new" element={<NewRecord />} />
+              <Route path="/submissions/:id" element={<RecordDetails />} />
               <Route path="/documents" element={<Documents />} />
               <Route path="/users" element={<Users />} />
               <Route path="*" element={<NotFound />} />
