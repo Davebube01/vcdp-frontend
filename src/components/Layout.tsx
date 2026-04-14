@@ -9,6 +9,7 @@ import {
   Users as UsersIcon,
   PlusCircle,
   LogOut,
+  ClipboardCheck,
 } from "lucide-react";
 import { useAuth } from "@/core/providers/AuthProvider";
 import { cn } from "@/lib/utils";
@@ -34,21 +35,50 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "@/components/ui/sidebar";
+import { Badge } from "./ui/badge";
+import { useRecords } from "@/core/services/loaders/records-loaders";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   const { user } = useAuth();
+  const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
 
+  const { data: pendingData } = useRecords(
+    new URLSearchParams({ status: "PENDING", size: "1" }),
+    { enabled: isNationalAdmin }
+  );
+  const pendingCount = pendingData?.total || 0;
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { label: "Submissions", icon: Table, href: "/submissions" },
     { label: "New Submission", icon: PlusCircle, href: "/submissions/new" },
+    { label: "Projects", icon: FolderSearch, href: "/projects" },
     { label: "Documents", icon: FolderSearch, href: "/documents" },
     ...(user?.role?.toUpperCase() === "NATIONAL_ADMIN"
-      ? [{ label: "Users", icon: UsersIcon, href: "/users" }]
+      ? [
+          {
+            label: "Pending Documents",
+            icon: ClipboardCheck,
+            href: "/submissions/pending",
+          },
+          { label: "Users", icon: UsersIcon, href: "/users" },
+        ]
       : []),
   ];
+
+  const isActiveLink = (href: string) => {
+    if (href === "/") return location.pathname === "/";
+    if (href === "/submissions") {
+      return (
+        location.pathname === "/submissions" ||
+        (location.pathname.startsWith("/submissions/") &&
+          !location.pathname.startsWith("/submissions/new") &&
+          !location.pathname.startsWith("/submissions/pending"))
+      );
+    }
+    return location.pathname.startsWith(href);
+  };
 
   return (
     <SidebarProvider>
@@ -66,29 +96,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <SidebarContent className="px-3">
             <SidebarMenu className="space-y-1">
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      item.href === "/"
-                        ? location.pathname === "/"
-                        : location.pathname.startsWith(item.href)
-                    }
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                      location.pathname === item.href
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    <NavLink to={item.href} end={item.href === "/"}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const active = isActiveLink(item.href);
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      <NavLink to={item.href} end={item.href === "/"}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                        {item.label === "Pending Approvals" && pendingCount > 0 && (
+                          <Badge className="ml-auto h-5 px-1.5 bg-amber-500 text-white border-none text-[10px] font-bold">
+                            {pendingCount}
+                          </Badge>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarContent>
 

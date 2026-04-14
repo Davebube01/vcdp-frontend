@@ -522,7 +522,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" /> Expenditure Trend
-              (2013 - 2025)
+              (2013 - {new Date().getFullYear()})
             </CardTitle>
             <CardDescription>
               Visualizing investment growth across all phases.
@@ -596,7 +596,14 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={metrics?.charts.threefs}
+                  data={metrics?.charts.threefs.map(item => ({
+                    ...item,
+                    name: item.name.includes("Component 1") ? "Agricultural Development" :
+                          item.name.includes("Component 2") ? "Infrastructure" :
+                          item.name.includes("Component 3") ? "Nutrition/Health" :
+                          item.name.includes("Component 4") ? "Social Assistance" :
+                          item.name.includes("Component 5") ? "Climate/Resources" : item.name
+                  }))}
                   innerRadius={80}
                   outerRadius={120}
                   paddingAngle={5}

@@ -9,7 +9,7 @@ export type Transaction = {
   fy_completed: number;
   programme_phase: string;
   fiscal_quarter: string;
-  vcdp_component: string;
+  vcdp_component: string[];
   vcdp_sub_components: string[];
   state: string;
   lgas: string[];
@@ -29,13 +29,19 @@ export type Transaction = {
   beneficiary_male: number;
   beneficiary_female: number;
   beneficiary_youth_under35: number;
+  beneficiary_male_percentage: number;
+  beneficiary_female_percentage: number;
+  beneficiary_youth_percentage: number;
+  beneficiary_plwd: number;
   value_chain_segments: string[];
   climate_flag: "Yes" | "No";
-  data_source: string;
+  data_source: string[];
   supporting_documents: string[];
   entered_by: string;
   entered_at: string;
   classification_notes: string;
+  status: "PENDING" | "REJECTED" | "DRAFT" | "PUBLISHED";
+  rejection_reason?: string;
 };
 
 // Generate initial mock data for VCDP
@@ -57,7 +63,7 @@ const generateMockData = (): Transaction[] => {
       fy_completed: 2024,
       programme_phase: "2nd AF",
       fiscal_quarter: "Q2",
-      vcdp_component: components[Math.floor(Math.random() * components.length)],
+      vcdp_component: [components[Math.floor(Math.random() * components.length)]],
       vcdp_sub_components: ["Market Infrastructure"],
       state: states[Math.floor(Math.random() * states.length)],
       lgas: ["Sample LGA"],
@@ -77,13 +83,18 @@ const generateMockData = (): Transaction[] => {
       beneficiary_male: 60,
       beneficiary_female: 40,
       beneficiary_youth_under35: 30,
+      beneficiary_male_percentage: 60,
+      beneficiary_female_percentage: 40,
+      beneficiary_youth_percentage: 30,
+      beneficiary_plwd: 5,
       value_chain_segments: ["Production"],
       climate_flag: "Yes",
-      data_source: "Monthly Progress Report",
+      data_source: ["Monthly Progress Report"],
       supporting_documents: [],
       entered_by: "admin-1",
       entered_at: new Date().toISOString(),
       classification_notes: "Standard transaction entry for infrastructure.",
+      status: "PUBLISHED",
     };
   });
 };

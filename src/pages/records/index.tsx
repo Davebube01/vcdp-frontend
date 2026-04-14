@@ -73,6 +73,7 @@ export default function Records() {
     threeFS_primary: "all",
     funding_group: "all",
     programme_phase: "all",
+    status: "all",
   });
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -131,6 +132,7 @@ export default function Records() {
       threeFS_primary: "all",
       funding_group: "all",
       programme_phase: "all",
+      status: "all",
     };
     setFilters(fresh);
     setTempFilters(fresh);
@@ -147,6 +149,7 @@ export default function Records() {
           programme_phase: filters.programme_phase,
         }),
         ...(filters.state !== "all" && { state: filters.state }),
+        ...(filters.status !== "all" && { status: filters.status }),
         ...(debouncedSearch && { search: debouncedSearch }),
       }),
     [page, filters, debouncedSearch, isNationalAdmin, user?.state],
@@ -192,7 +195,7 @@ export default function Records() {
       header: "Component",
       cell: ({ row }) => (
         <span className="text-xs uppercase font-semibold text-slate-500">
-          {row.original.vcdp_component}
+          {row.original.vcdp_component?.join(", ")}
         </span>
       ),
     },
@@ -204,6 +207,24 @@ export default function Records() {
           ${row.original.expenditure_total.toLocaleString()}
         </div>
       ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const s = row.original.status;
+        let color = "bg-slate-100 text-slate-600";
+        if (s === "PUBLISHED") color = "bg-emerald-100 text-emerald-700";
+        if (s === "PENDING") color = "bg-amber-100 text-amber-700 border-amber-200";
+        if (s === "REJECTED") color = "bg-rose-100 text-rose-700 border-rose-200";
+        if (s === "DRAFT") color = "bg-slate-200 text-slate-700";
+
+        return (
+          <Badge className={`${color} border-none font-bold text-[10px] uppercase`}>
+            {s}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "entered_at",
@@ -475,6 +496,25 @@ export default function Records() {
                           <SelectItem value="private">
                             Private Sector
                           </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Status</Label>
+                      <Select
+                        value={tempFilters.status}
+                        onValueChange={(v) => updateTempFilter("status", v)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="PUBLISHED">Published</SelectItem>
+                          <SelectItem value="PENDING">Pending</SelectItem>
+                          <SelectItem value="REJECTED">Rejected</SelectItem>
+                          <SelectItem value="DRAFT">Draft</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

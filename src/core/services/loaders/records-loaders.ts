@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Transaction } from "@/lib/store";
 import { recordsApi, RecordsListResponse } from "../API/records";
 
-export function useRecords(params: URLSearchParams) {
+export function useRecords(params: URLSearchParams, options: any = {}) {
   return useQuery<RecordsListResponse>({
     queryKey: ["records", "list", params.toString()],
     queryFn: () => recordsApi.list(params),
+    ...options,
   });
 }
 

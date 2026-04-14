@@ -30,6 +30,14 @@ export const recordsApi = {
       method: "DELETE",
     }),
 
+  updateStatus: (id: string, status: string, reason?: string) =>
+    apiRequest<Transaction>(
+      `/api/records/${id}/status?status=${status}${reason ? `&rejection_reason=${encodeURIComponent(reason)}` : ""}`,
+      {
+        method: "PUT",
+      }
+    ),
+
   exportExcel: (params: URLSearchParams) => {
     const token = localStorage.getItem("auth_token");
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "";

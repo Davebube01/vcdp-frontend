@@ -56,8 +56,8 @@ export function MultiSelect({
       <div className="group rounded-md border border-input px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 bg-background">
         <div className="flex flex-wrap gap-1">
           {selected.map((option) => (
-            <Badge key={option} variant="secondary">
-              {option}
+            <Badge key={option} variant="secondary" className="max-w-full flex items-center pr-1">
+              <span className="truncate leading-normal" title={option}>{option}</span>
               <button
                 className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={disabled}

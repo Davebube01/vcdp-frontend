@@ -13,7 +13,24 @@ import {
   Printer,
   History,
   FileCheck,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  MessageSquare,
 } from "lucide-react";
+import { useAuth } from "@/core/providers/AuthProvider";
+import { useUpdateRecordStatusAction } from "@/core/services/actions/record-actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,14 +43,49 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function RecordDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
+  const [rejectionReason, setRejectionReason] = React.useState("");
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
 
-  console.log("RecordDetails ID:", id);
   const { data: record, isLoading, error } = useRecord(id || "");
-  console.log("Record data:", record, "Error:", error);
+  const updateStatusMutation = useUpdateRecordStatusAction();
+
+  const handleStatusUpdate = async (status: string, reason?: string) => {
+    try {
+      await updateStatusMutation.mutateAsync({
+        id: id || "",
+        status,
+        reason,
+      });
+      toast({
+        title: `Submission ${status.toLowerCase()}`,
+        description: `The record has been moved to ${status.toLowerCase()} state.`,
+      });
+      if (status === "REJECTED") {
+        setIsRejectDialogOpen(false);
+        setRejectionReason("");
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading)
     return (
@@ -46,6 +98,27 @@ export default function RecordDetails() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
+      {record.status === "REJECTED" && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 flex flex-col md:flex-row gap-4 items-start md:items-center animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-rose-800 text-lg">Submission Rejected</h3>
+            <p className="text-rose-700 text-sm mt-1 leading-relaxed">
+              {record.rejection_reason || "No specific feedback provided. Please review all fields and resubmit."}
+            </p>
+          </div>
+          {user?.role?.toUpperCase() === "STATE_COORDINATOR" && (
+            <Button className="bg-rose-600 hover:bg-rose-700 text-white shrink-0" asChild>
+              <Link to={`/submissions/${id}/edit`}>
+                Edit & Fix Submission
+              </Link>
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sticky bg-background/80 backdrop-blur-md py-4 -mx-4 px-4 border-b">
         <div className="flex items-center gap-4">
           <Button
@@ -60,9 +133,23 @@ export default function RecordDetails() {
               <h2 className="text-2xl font-display font-bold text-foreground">
                 {record.ref_id}
               </h2>
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none px-3 font-bold uppercase tracking-wide">
-                Verified
-              </Badge>
+              {record.status === "PUBLISHED" ? (
+                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none px-3 font-bold uppercase tracking-wide">
+                  Published
+                </Badge>
+              ) : record.status === "PENDING" ? (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200 px-3 font-bold uppercase tracking-wide">
+                  Pending Review
+                </Badge>
+              ) : record.status === "REJECTED" ? (
+                <Badge className="bg-rose-100 text-rose-700 border-rose-200 px-3 font-bold uppercase tracking-wide">
+                  Rejected
+                </Badge>
+              ) : (
+                <Badge className="bg-slate-100 text-slate-700 border-slate-200 px-3 font-bold uppercase tracking-wide">
+                  Draft
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground font-medium">
               {record.project_name}
@@ -70,19 +157,92 @@ export default function RecordDetails() {
           </div>
         </div>
         <div className="flex gap-2">
+          {isNationalAdmin && record.status === "PENDING" && (
+            <>
+              <Dialog
+                open={isRejectDialogOpen}
+                onOpenChange={setIsRejectDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 gap-2">
+                    <XCircle className="w-4 h-4" /> Reject
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Reject Submission</DialogTitle>
+                    <DialogDescription>
+                      Provide a reason for rejection so the state coordinator knows what to fix.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Textarea
+                      placeholder="Enter rejection reason..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsRejectDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleStatusUpdate("REJECTED", rejectionReason)}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      Confirm Rejection
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-lg shadow-emerald-200">
+                    <CheckCircle className="w-4 h-4" /> Approve
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Approval Destination</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="flex flex-col items-start gap-1 py-3"
+                    onClick={() => handleStatusUpdate("PUBLISHED")}
+                  >
+                    <div className="font-bold flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Approve & Publish
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Make this live on all analytics dashboards immediately.
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex flex-col items-start gap-1 py-3"
+                    onClick={() => handleStatusUpdate("DRAFT")}
+                  >
+                    <div className="font-bold flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                      Approve as Draft
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Finalize record but keep it hidden from dashboards.
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+
           <Button
             variant="outline"
             className="gap-2"
             onClick={() => window.print()}
           >
-            <Printer className="w-4 h-4" /> Print Report
+            <Printer className="w-4 h-4" /> Print
           </Button>
-          {/* <Button variant="outline" className="gap-2">
-            <History className="w-4 h-4" /> Audit Log
-          </Button>
-          <Button variant="default" className="shadow-lg shadow-primary/20">
-            Edit Record
-          </Button> */}
         </div>
       </div>
 
@@ -201,12 +361,20 @@ export default function RecordDetails() {
                   </h5>
                   <div className="space-y-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">
-                        Primary Component
+                      <p className="text-xs text-muted-foreground mb-1">
+                        VCDP Component(s)
                       </p>
-                      <p className="font-bold text-emerald-900">
-                        {record.vcdp_component}
-                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {record.vcdp_component.map((c) => (
+                          <Badge
+                            key={c}
+                            variant="secondary"
+                            className="bg-emerald-100 text-emerald-800 border-emerald-200"
+                          >
+                            {c}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">
@@ -354,41 +522,30 @@ export default function RecordDetails() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">
-                    Male
-                  </p>
+                  <p className="text-[10px] font-bold text-muted-foreground">Male</p>
                   <p className="text-lg font-bold">{record.beneficiary_male}</p>
                 </div>
                 <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">
-                    Female
-                  </p>
-                  <p className="text-lg font-bold">
-                    {record.beneficiary_female}
-                  </p>
+                  <p className="text-[10px] font-bold text-muted-foreground">Male %</p>
+                  <p className="text-lg font-bold">{record.beneficiary_male_percentage ?? "0.0"}%</p>
                 </div>
-                <div className="border-l-2 border-rose-300 pl-3 bg-rose-50/50 p-2 rounded-r-lg">
-                  <p className="text-[10px] font-bold text-rose-600">
-                    Youth (&lt;35)
-                  </p>
-                  <p className="text-lg font-bold text-rose-700">
-                    {record.beneficiary_youth_under35 ?? 0}
-                  </p>
+                
+                <div className="border-l-2 border-rose-200 pl-3">
+                  <p className="text-[10px] font-bold text-muted-foreground">Female</p>
+                  <p className="text-lg font-bold">{record.beneficiary_female}</p>
                 </div>
                 <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">
-                    Youth %
-                  </p>
-                  <p className="text-lg font-bold">
-                    {record.beneficiary_total && record.beneficiary_total > 0
-                      ? (
-                          ((record.beneficiary_youth_under35 ?? 0) /
-                            record.beneficiary_total) *
-                          100
-                        ).toFixed(1)
-                      : "0.0"}
-                    %
-                  </p>
+                  <p className="text-[10px] font-bold text-muted-foreground">Female %</p>
+                  <p className="text-lg font-bold">{record.beneficiary_female_percentage ?? "0.0"}%</p>
+                </div>
+
+                <div className="border-l-2 border-rose-300 pl-3 bg-rose-50/50 p-2 rounded-r-lg">
+                  <p className="text-[10px] font-bold text-rose-600">Youth (&lt;35)</p>
+                  <p className="text-lg font-bold text-rose-700">{record.beneficiary_youth_under35 ?? 0}</p>
+                </div>
+                <div className="border-l-2 border-rose-200 pl-3">
+                  <p className="text-[10px] font-bold text-muted-foreground">Youth %</p>
+                  <p className="text-lg font-bold">{record.beneficiary_youth_percentage ?? "0.0"}%</p>
                 </div>
               </div>
             </CardContent>

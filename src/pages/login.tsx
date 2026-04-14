@@ -20,7 +20,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Lock, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/core/providers/AuthProvider";
 
 const loginSchema = z.object({
@@ -34,7 +34,7 @@ export default function Login() {
   const { toast } = useToast();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-
+const [showPassword, setShowPassword] = useState(false);
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -80,7 +80,7 @@ export default function Login() {
               VCDP
             </h1>
             <p className="text-muted-foreground font-medium mt-1">
-              VCDP Transaction Tracking & 3FS Reporting
+              Financial Flows to Food Systems Tracker Tool (UN 3FS)
             </p>
           </div>
         </div>
@@ -130,12 +130,24 @@ export default function Login() {
                       <FormControl>
                         <div className="relative">
                           <Input
-                            type="password"
+                            type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
                             {...field}
                             className="h-12 px-4 bg-white/50 border-slate-200 focus:ring-2 focus:ring-primary/20 transition-all font-medium"
                           />
-                          <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </Button>
                         </div>
                       </FormControl>
                       <FormMessage />

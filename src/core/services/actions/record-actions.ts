@@ -38,3 +38,24 @@ export function useDeleteRecordAction() {
     },
   });
 }
+
+export function useUpdateRecordStatusAction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      status,
+      reason,
+    }: {
+      id: string;
+      status: string;
+      reason?: string;
+    }) => recordsApi.updateStatus(id, status, reason),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["records", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["records", "detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] });
+    },
+  });
+}

@@ -10,10 +10,13 @@ import Login from "@/pages/login";
 import NewRecord from "@/pages/records/new";
 import Records from "@/pages/records/index";
 import RecordDetails from "@/pages/records/details";
+import EditRecord from "@/pages/records/edit";
 import Documents from "@/pages/documents";
+import Projects from "@/pages/projects";
 import Users from "@/pages/users";
 import { InsightProvider } from "@/lib/store";
 import { AuthProvider } from "./core/providers/AuthProvider";
+import PendingSubmissions from "./pages/records/pending";
 
 function Router() {
   return (
@@ -28,8 +31,11 @@ function Router() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/submissions" element={<Records />} />
               <Route path="/submissions/new" element={<NewRecord />} />
+              <Route path="/submissions/pending" element={<PendingSubmissions />} />
               <Route path="/submissions/:id" element={<RecordDetails />} />
+              <Route path="/submissions/:id/edit" element={<EditRecord />} />
               <Route path="/documents" element={<Documents />} />
+              <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

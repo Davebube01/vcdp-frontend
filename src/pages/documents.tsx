@@ -301,7 +301,7 @@ export default function Documents() {
                 Document Name
               </TableHead>
               <TableHead className="font-bold uppercase text-[10px]">
-                Category
+                Data Source Tag
               </TableHead>
               <TableHead className="font-bold uppercase text-[10px]">
                 State/Origin

@@ -43,6 +43,7 @@ import {
 } from "@/core/services/loaders/meta-loaders";
 import { useCreateRecordAction } from "@/core/services/actions/record-actions";
 import { useDocuments } from "@/core/services/loaders/documents-loaders";
+import { useProjects } from "@/core/services/loaders/project-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -71,7 +72,7 @@ const formSchema = z
     fy_completed: z.string().min(1, "FY Completed is required"),
     programme_phase: z.string(),
     fiscal_quarter: z.string().min(1, "Fiscal Quarter is required"),
-    vcdp_component: z.string().min(1, "VCDP Component is required"),
+    vcdp_component: z.array(z.string()).min(1, "At least one VCDP Component is required"),
     vcdp_sub_components: z
       .array(z.string())
       .min(1, "At least one sub-component required"),
@@ -120,6 +121,9 @@ const formSchema = z
     beneficiary_youth_under35: z
       .union([z.coerce.number(), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
+    beneficiary_plwd: z
+      .union([z.coerce.number(), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
     value_chain_segments: z.array(z.string()),
     climate_flag: z.boolean(),
     data_source: z
@@ -127,6 +131,7 @@ const formSchema = z
       .min(1, "At least one Data Source required"),
     supporting_documents: z.array(z.string()),
     classification_notes: z.string().max(200).optional(),
+    status: z.enum(["PENDING", "REJECTED", "DRAFT", "PUBLISHED"]).optional(),
   })
   .refine(
     (data) => {
@@ -175,6 +180,7 @@ export default function NewRecord() {
   const { data: commodities } = useCommodities();
   const { data: years } = useFiscalYears();
   const { data: segments } = useValueChainSegments();
+  const { data: projectsList } = useProjects();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema) as any,
@@ -186,7 +192,7 @@ export default function NewRecord() {
       fy_completed: "",
       programme_phase: "VCDP Phase II",
       fiscal_quarter: "",
-      vcdp_component: "",
+      vcdp_component: [],
       vcdp_sub_components: [],
       state: isNationalAdmin ? "" : user?.state || "",
       lgas: [],
@@ -207,11 +213,13 @@ export default function NewRecord() {
       beneficiary_male: "" as any,
       beneficiary_female: "" as any,
       beneficiary_youth_under35: "" as any,
+      beneficiary_plwd: "" as any,
       value_chain_segments: [],
       climate_flag: false,
       data_source: [],
       supporting_documents: [],
       classification_notes: "",
+      status: isNationalAdmin ? "PUBLISHED" : "PENDING",
     },
   });
 
@@ -234,10 +242,11 @@ export default function NewRecord() {
     const year = parseInt(watchedValues.fy_awarded || "0");
     if (year >= 2013 && year <= 2018) {
       form.setValue("programme_phase", "Original (2013-2018)");
-    } else if (year >= 2019 && year <= 2021) {
-      form.setValue("programme_phase", "1st AF");
-    } else if (year >= 2022) {
-      form.setValue("programme_phase", "2nd AF");
+    } else if (year >= 2019) {
+      const currentPhase = form.getValues("programme_phase");
+      if (currentPhase === "Original (2013-2018)") {
+        form.setValue("programme_phase", "");
+      }
     }
   }, [watchedValues.fy_awarded, form]);
 
@@ -296,11 +305,13 @@ export default function NewRecord() {
 
   // Logic: Filtered VCDP Sub-Components
   const filteredVcdpSubs = useMemo(() => {
-    return (
-      (vcdpMeta as Record<string, string[]>)?.[
-        watchedValues.vcdp_component || ""
-      ] || []
-    );
+    const selectedFilteredVcdpSubs = watchedValues.vcdp_component || []
+
+    if (selectedFilteredVcdpSubs.length === 0) return []
+    
+    return selectedFilteredVcdpSubs.flatMap(
+      (vcpdsubs) => (vcdpMeta as Record<string, string[]>)?.[vcpdsubs] || [],
+    )
   }, [watchedValues.vcdp_component, vcdpMeta]);
 
   // Logic: Dynamic Supporting Documents
@@ -343,6 +354,38 @@ export default function NewRecord() {
 
   const createRecordMutation = useCreateRecordAction();
 
+  const fieldLabels: Record<string, string> = {
+    ref_id: "Project Reference Number",
+    project_name: "Project Name",
+    commodity: "Commodity Value Chain",
+    fy_awarded: "Fiscal Year (Awarded)",
+    fy_completed: "Fiscal Year (Completed)",
+    fiscal_quarter: "Fiscal Quarter",
+    vcdp_component: "VCDP Component",
+    vcdp_sub_components: "VCDP Sub-Component(s)",
+    state: "State",
+    lgas: "LGAs",
+    threeFS_primary: "3FS Component (Primary)",
+    funding_sources: "Funding Source",
+    data_source: "Data Source",
+    beneficiary_total: "Total Headcount",
+    beneficiary_male: "Male Headcount",
+    beneficiary_female: "Female Headcount",
+  };
+
+  const onInvalid = (errors: any) => {
+    const errorFields = Object.keys(errors);
+    const labels = errorFields
+      .map((key) => fieldLabels[key] || key)
+      .join(", ");
+    
+    toast({
+      title: "Missing Information",
+      description: `Please check the following fields: ${labels}`,
+      variant: "destructive",
+    });
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (totalExpenditure <= 0) {
       toast({
@@ -353,11 +396,21 @@ export default function NewRecord() {
       return;
     }
 
+    const t = Number(values.beneficiary_total) || 0;
+    const m = Number(values.beneficiary_male) || 0;
+    const f = Number(values.beneficiary_female) || 0;
+    const y = Number(values.beneficiary_youth_under35) || 0;
+    const p = Number(values.beneficiary_plwd) || 0;
+
     const payload = {
       ...values,
       fy_awarded: parseInt(values.fy_awarded),
       fy_completed: parseInt(values.fy_completed),
       climate_flag: values.climate_flag ? "Yes" : "No",
+      beneficiary_male_percentage: t > 0 ? parseFloat(((m / t) * 100).toFixed(1)) : 0,
+      beneficiary_female_percentage: t > 0 ? parseFloat(((f / t) * 100).toFixed(1)) : 0,
+      beneficiary_youth_percentage: t > 0 ? parseFloat(((y / t) * 100).toFixed(1)) : 0,
+      beneficiary_plwd: p,
     };
 
     createRecordMutation.mutate(payload, {
@@ -395,9 +448,9 @@ export default function NewRecord() {
           <h2 className="text-3xl font-display font-bold text-primary tracking-tight">
             New 3FS Record
           </h2>
-          <p className="text-muted-foreground mt-1 font-medium italic">
+          {/* <p className="text-muted-foreground mt-1 font-medium italic">
             Project Year
-          </p>
+          </p> */}
         </div>
         <div className="hidden md:block">
           <FileCheck className="w-12 h-12 text-primary/20" />
@@ -406,7 +459,7 @@ export default function NewRecord() {
 
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={form.handleSubmit(onSubmit, onInvalid)}
           className="space-y-8 pb-20"
         >
           {/* SECTION 1: Identifiers */}
@@ -427,11 +480,57 @@ export default function NewRecord() {
                 control={form.control}
                 name="ref_id"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Reference Number/Transaction ID </FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. VCDP/LGA/2024/001" {...field} />
-                    </FormControl>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Project Reference Number/Transaction ID <span className="text-red-500">*</span></FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between bg-white text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? projectsList?.find((p) => p.ref_id === field.value)?.ref_id || field.value
+                              : "Select Project"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search projects..." />
+                          <CommandList>
+                            <CommandEmpty>No project found.</CommandEmpty>
+                            <CommandGroup>
+                              {projectsList?.map((p) => (
+                                <CommandItem
+                                  value={p.ref_id}
+                                  key={p.id}
+                                  onSelect={() => {
+                                    form.setValue("ref_id", p.ref_id);
+                                    form.setValue("project_name", p.name);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      p.ref_id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {p.ref_id} - {p.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -441,9 +540,14 @@ export default function NewRecord() {
                 name="project_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Name/Specific Activity Name </FormLabel>
+                    <FormLabel>Project Name/Specific Activity Name <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Market Development" {...field} />
+                      <Input
+                        placeholder="Auto-filled from project selection"
+                        {...field}
+                        readOnly
+                        className="bg-slate-50 text-muted-foreground cursor-not-allowed"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -454,7 +558,7 @@ export default function NewRecord() {
                 name="commodity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commodity Value Chain</FormLabel>
+                    <FormLabel>Commodity Value Chain <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <MultiSelect
                         options={commodities || []}
@@ -473,7 +577,7 @@ export default function NewRecord() {
                   name="fy_awarded"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Fiscal Year (Awarded)</FormLabel>
+                      <FormLabel>Fiscal Year (Awarded) <span className="text-red-500">*</span></FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -533,7 +637,7 @@ export default function NewRecord() {
                   name="fy_completed"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fiscal Year (Completed)</FormLabel>
+                      <FormLabel>Fiscal Year (Completed) <span className="text-red-500">*</span></FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -601,26 +705,52 @@ export default function NewRecord() {
               <FormField
                 control={form.control}
                 name="programme_phase"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Programme Phase</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        disabled
-                        className="bg-slate-50 font-semibold text-blue-700"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const year = parseInt(watchedValues.fy_awarded || "0");
+                  const isDropdown = year >= 2019;
+                  return (
+                    <FormItem>
+                      <FormLabel>Programme Phase</FormLabel>
+                      {isDropdown ? (
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Programme Phase" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1st Additional Financing">
+                              1st Additional Financing
+                            </SelectItem>
+                            <SelectItem value="2nd Additional Financing">
+                              2nd Additional Financing
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <FormControl>
+                          <Input
+                            {...field}
+                            disabled
+                            className="bg-slate-50 font-semibold text-blue-700"
+                          />
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <FormField
                 control={form.control}
                 name="fiscal_quarter"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fiscal Quarter</FormLabel>
+                    <FormLabel>Fiscal Quarter <span className="text-red-500">*</span></FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
@@ -665,27 +795,15 @@ export default function NewRecord() {
                   name="vcdp_component"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>VCDP Component</FormLabel>
-                      <Select
-                        onValueChange={(val) => {
-                          field.onChange(val);
-                          form.setValue("vcdp_sub_components", []);
-                        }}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Component" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {vcdpMeta &&
-                            Object.keys(vcdpMeta).map((c) => (
-                              <SelectItem key={c} value={c}>
-                                {c}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>VCDP Component <span className="text-red-500">*</span></FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={vcdpMeta ? Object.keys(vcdpMeta) : []}
+                          selected={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Component"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -695,7 +813,7 @@ export default function NewRecord() {
                   name="vcdp_sub_components"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>VCDP Sub-Component(s)</FormLabel>
+                      <FormLabel>VCDP Sub-Component(s) <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={filteredVcdpSubs}
@@ -770,7 +888,7 @@ export default function NewRecord() {
                   name="state"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Geographic Location (State)</FormLabel>
+                      <FormLabel>Geographic Location (State) <span className="text-red-500">*</span></FormLabel>
                       <Select
                         onValueChange={(val) => {
                           field.onChange(val);
@@ -808,7 +926,7 @@ export default function NewRecord() {
                   name="lgas"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Sub-geographic Location (LGAs)</FormLabel>
+                      <FormLabel>Sub-geographic Location (LGAs) <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={filteredLGAs}
@@ -840,7 +958,7 @@ export default function NewRecord() {
                   name="funding_sources"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Funding Source</FormLabel>
+                      <FormLabel>Funding Source <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
                         <MultiSelect
                           options={fundMeta ? Object.keys(fundMeta) : []}
@@ -1178,7 +1296,7 @@ export default function NewRecord() {
           </Card>
 
           {/* SECTION 6: Value Chain & Data Sources */}
-          <Card className="glass-card shadow-sm border-l-4 border-l-indigo-500 relative z-50 overflow-visible">
+          <Card className="glass-card shadow-sm border-l-4 border-l-indigo-500 relative z-40 overflow-visible">
             <CardHeader>
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs">
@@ -1250,32 +1368,33 @@ export default function NewRecord() {
                 name="beneficiary_categories"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Beneficiary Categories</FormLabel>
+                    <FormLabel>Beneficiary Categories <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <MultiSelect
                         options={[
-                          "Smallholder Farmers",
+                          "Farmers",
                           "Processors",
-                          "Marketers",
-                          "Input Providers",
-                          "Youth Groups",
-                          "Women Groups",
+                          "Traders",
+                          "Input Supplier",
+                          "Service Providers or Infrastructure Developer",
+                          "Farmer Organizations",
                         ]}
                         selected={field.value}
                         onChange={field.onChange}
+                        
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                 <FormField
                   control={form.control}
                   name="beneficiary_total"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Headcount</FormLabel>
+                      <FormLabel>Total Headcount <span className="text-red-500">*</span></FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -1301,93 +1420,160 @@ export default function NewRecord() {
                 <FormField
                   control={form.control}
                   name="beneficiary_male"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Male</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const total = Number(watchedValues.beneficiary_total) || 0;
+                    const male = Number(field.value) || 0;
+                    const percentage = total > 0 ? ((male / total) * 100).toFixed(1) : "0.0";
+                    return (
+                      <FormItem>
+                        <FormLabel>Male</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Strip leading zeros unless it's just "0"
+                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                              field.onChange(
+                                cleanVal === ""
+                                  ? ""
+                                  : val.startsWith("0") && val.length > 1
+                                    ? Number(cleanVal)
+                                    : val,
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        {total > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1 font-medium">
+                            {percentage}% of Total Headcount
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="beneficiary_female"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Female</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const total = Number(watchedValues.beneficiary_total) || 0;
+                    const female = Number(field.value) || 0;
+                    const percentage = total > 0 ? ((female / total) * 100).toFixed(1) : "0.0";
+                    return (
+                      <FormItem>
+                        <FormLabel>Female</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Strip leading zeros unless it's just "0"
+                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                              field.onChange(
+                                cleanVal === ""
+                                  ? ""
+                                  : val.startsWith("0") && val.length > 1
+                                    ? Number(cleanVal)
+                                    : val,
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        {total > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1 font-medium">
+                            {percentage}% of Total Headcount
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="beneficiary_youth_under35"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Youth (&lt;35)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const total = Number(watchedValues.beneficiary_total) || 0;
+                    const youth = Number(field.value) || 0;
+                    const percentage = total > 0 ? ((youth / total) * 100).toFixed(1) : "0.0";
+                    return (
+                      <FormItem>
+                        <FormLabel>Youth (&lt;35)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Strip leading zeros unless it's just "0"
+                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                              field.onChange(
+                                cleanVal === ""
+                                  ? ""
+                                  : val.startsWith("0") && val.length > 1
+                                    ? Number(cleanVal)
+                                    : val,
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        {total > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1 font-medium">
+                            {percentage}% of Total Headcount
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+                <FormField
+                  control={form.control}
+                  name="beneficiary_plwd"
+                  render={({ field }) => {
+                    const total = Number(watchedValues.beneficiary_total) || 0;
+                    const plwd = Number(field.value) || 0;
+                    const percentage = total > 0 ? ((plwd / total) * 100).toFixed(1) : "0.0";
+                    return (
+                      <FormItem>
+                        <FormLabel>PLWD (People Living With Disabilities)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                              field.onChange(
+                                cleanVal === ""
+                                  ? ""
+                                  : val.startsWith("0") && val.length > 1
+                                    ? Number(cleanVal)
+                                    : val,
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        {total > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1 font-medium">
+                            {percentage}% of Total Headcount
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* SECTION 8: Finalization */}
-          <Card className="glass-card shadow-sm border-l-4 border-l-gray-400">
+          <Card className="glass-card shadow-sm border-l-4 border-l-gray-400 -z-30">
             <CardHeader>
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-xs">
@@ -1408,7 +1594,7 @@ export default function NewRecord() {
                           Climate/Environment Flag
                         </FormLabel>
                         <FormDescription>
-                          Is this activity primarily for climate adaptation?
+                          Does this project support climate adaptation, mitigation, or environmental sustainability activities?
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -1475,6 +1661,35 @@ export default function NewRecord() {
                   Make sure all linked documents are uploaded in the M&E backend
                   before final submission if a reference link is available.
                 </div>
+                {isNationalAdmin && (
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Submission Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="bg-white">
+                              <SelectValue placeholder="Select Status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="PUBLISHED">Published (Live on Dashboard)</SelectItem>
+                            <SelectItem value="DRAFT">Draft (Hidden from Dashboard)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Control whether this record is visible on the analytical dashboard.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
