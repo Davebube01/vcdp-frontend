@@ -17,8 +17,10 @@ import {
   XCircle,
   AlertCircle,
   MessageSquare,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "@/core/providers/AuthProvider";
+import { useCurrency } from "@/core/providers/CurrencyProvider";
 import { useUpdateRecordStatusAction } from "@/core/services/actions/record-actions";
 import {
   Dialog,
@@ -56,6 +58,7 @@ export default function RecordDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { formatValue } = useCurrency();
   const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
   const [rejectionReason, setRejectionReason] = React.useState("");
   const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
@@ -239,6 +242,16 @@ export default function RecordDetails() {
           <Button
             variant="outline"
             className="gap-2"
+            asChild
+          >
+            <Link to={`/submissions/${id}/edit`}>
+              <Pencil className="w-4 h-4" /> Edit
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="gap-2"
             onClick={() => window.print()}
           >
             <Printer className="w-4 h-4" /> Print
@@ -287,7 +300,7 @@ export default function RecordDetails() {
                     Fiscal Quarter
                   </p>
                   <p className="text-xl font-display font-bold">
-                    {record.fiscal_quarter}
+                    {Array.isArray(record.fiscal_quarter) ? record.fiscal_quarter.join(", ") : record.fiscal_quarter}
                   </p>
                 </div>
               </div>
@@ -299,46 +312,53 @@ export default function RecordDetails() {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
                     {[
-                      {
-                        label: "IFAD (Original ODA)",
-                        value: record.expenditure_ifad,
+                      { label: "IFAD Loan (ODA)", value: record.expenditure_ifad_loan },
+                      { label: "IFAD Grant (ODA)", value: record.expenditure_ifad_grant },
+                      { label: "FGN (Federal Govt)", value: record.expenditure_fgn },
+                      { label: "State/LGA", value: record.expenditure_state },
+                      { label: "Beneficiary", value: record.expenditure_beneficiary },
+                      { 
+                        label: "IFAD OOF", 
+                        value: record.expenditure_oof,
+                        desc: record.sub_funding_oof_text 
                       },
                       {
-                        label: "FGN (Federal Government)",
-                        value: record.expenditure_fgn,
+                        label: "Private Sector",
+                        value: record.expenditure_private_sector,
+                        desc: record.sub_funding_private_text
                       },
                       {
-                        label: "State/LGA Contribution",
-                        value: record.expenditure_state,
+                        label: "Value Chain",
+                        value: record.expenditure_value_chain,
+                        desc: record.sub_funding_value_chain_text
                       },
-                      {
-                        label: "Beneficiary (Private)",
-                        value: record.expenditure_beneficiary,
-                      },
-                      { label: "IFAD OOF", value: record.expenditure_oof },
-                      {
-                        label: "Other / Private Capital",
-                        value: record.expenditure_other,
-                      },
+                      { label: "Other/Misc", value: record.expenditure_other },
                     ].map((item) => (
                       <div
                         key={item.label}
-                        className="flex justify-between items-center py-2 border-b border-dashed"
+                        className="flex flex-col py-2 border-b border-dashed"
                       >
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {item.label}
-                        </span>
-                        <span className="font-mono font-bold">
-                          ${(item.value ?? 0).toLocaleString()}
-                        </span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground font-medium">
+                            {item.label}
+                          </span>
+                          <span className="font-mono font-bold">
+                            {formatValue(item.value ?? 0, record.currency as any)}
+                          </span>
+                        </div>
+                        {item.desc && (
+                          <p className="text-[10px] text-muted-foreground italic mt-0.5">
+                            {item.desc}
+                          </p>
+                        )}
                       </div>
                     ))}
                     <div className="md:col-span-2 flex justify-between items-center py-4 px-6 bg-slate-900 text-white rounded-xl mt-4 shadow-xl">
                       <span className="text-sm font-bold uppercase tracking-wider">
-                        Grand Total (USD)
+                        Grand Total
                       </span>
                       <span className="text-3xl font-display font-bold">
-                        ${(record.expenditure_total ?? 0).toLocaleString()}
+                        {formatValue(record.expenditure_total ?? 0, record.currency as any)}
                       </span>
                     </div>
                   </div>
@@ -365,7 +385,7 @@ export default function RecordDetails() {
                         VCDP Component(s)
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {record.vcdp_component.map((c) => (
+                        {Array.isArray(record.vcdp_component) ? record.vcdp_component.map((c) => (
                           <Badge
                             key={c}
                             variant="secondary"
@@ -373,7 +393,7 @@ export default function RecordDetails() {
                           >
                             {c}
                           </Badge>
-                        ))}
+                        )) : <Badge variant="secondary">{record.vcdp_component || "N/A"}</Badge>}
                       </div>
                     </div>
                     <div>
@@ -381,7 +401,7 @@ export default function RecordDetails() {
                         Sub-Components
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {record.vcdp_sub_components.map((s) => (
+                        {Array.isArray(record.vcdp_sub_components) ? record.vcdp_sub_components.map((s) => (
                           <Badge
                             key={s}
                             variant="secondary"
@@ -389,7 +409,7 @@ export default function RecordDetails() {
                           >
                             {s}
                           </Badge>
-                        ))}
+                        )) : <Badge variant="secondary">{record.vcdp_sub_components || "N/A"}</Badge>}
                       </div>
                     </div>
                   </div>
@@ -404,11 +424,11 @@ export default function RecordDetails() {
                         3FS Primary Mapping
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {record.threeFS_primary.map((s) => (
+                        {Array.isArray(record.threeFS_primary) ? record.threeFS_primary.map((s) => (
                           <Badge key={s} className="bg-slate-800 text-white">
                             {s}
                           </Badge>
-                        ))}
+                        )) : <Badge className="bg-slate-800 text-white">{record.threeFS_primary || "N/A"}</Badge>}
                       </div>
                     </div>
                     <div>
@@ -416,7 +436,7 @@ export default function RecordDetails() {
                         3FS Sub-Components
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {record.threeFS_sub_components.map((s) => (
+                        {Array.isArray(record.threeFS_sub_components) ? record.threeFS_sub_components.map((s) => (
                           <Badge
                             key={s}
                             variant="outline"
@@ -424,7 +444,7 @@ export default function RecordDetails() {
                           >
                             {s}
                           </Badge>
-                        ))}
+                        )) : <Badge variant="outline" className="border-slate-300">{record.threeFS_sub_components || "N/A"}</Badge>}
                       </div>
                     </div>
                   </div>
@@ -476,6 +496,12 @@ export default function RecordDetails() {
             <CardContent className="pt-4 space-y-4">
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                  Executing Agency
+                </label>
+                <p className="text-lg font-bold text-orange-700">{record.executing_agency || "N/A"}</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
                   Implementation State
                 </label>
                 <p className="text-lg font-bold">{record.state}</p>
@@ -485,7 +511,7 @@ export default function RecordDetails() {
                   Targeted LGAs ({record.lgas.length})
                 </label>
                 <div className="flex flex-wrap gap-1.5 mt-1">
-                  {record.lgas.map((l) => (
+                  {Array.isArray(record.lgas) ? record.lgas.map((l) => (
                     <Badge
                       key={l}
                       variant="outline"
@@ -493,7 +519,7 @@ export default function RecordDetails() {
                     >
                       {l}
                     </Badge>
-                  ))}
+                  )) : <Badge variant="outline">{record.lgas || "N/A"}</Badge>}
                 </div>
               </div>
               <div>
@@ -501,7 +527,12 @@ export default function RecordDetails() {
                   Value Chain Segments
                 </label>
                 <p className="text-sm font-medium">
-                  {record.value_chain_segments.join(", ")}
+                  {Array.isArray(record.value_chain_segments) ? record.value_chain_segments.join(", ") : (record.value_chain_segments || "N/A")}
+                  {record.value_chain_segments_other && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      Other details: {record.value_chain_segments_other}
+                    </span>
+                  )}
                 </p>
               </div>
             </CardContent>
@@ -510,44 +541,61 @@ export default function RecordDetails() {
           <Card className="glass-card shadow-sm border-l-4 border-l-rose-500 overflow-hidden">
             <CardHeader className="bg-rose-50 border-b py-3 px-4">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-rose-800">
-                <UsersIcon className="w-4 h-4" /> Beneficiary Reach
+                <UsersIcon className="w-4 h-4" /> {record.unit === "Person" ? "Beneficiary Reach" : "Physical Progress"}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="text-3xl font-display font-bold text-rose-600 mb-4">
                 {(record.beneficiary_total ?? 0).toLocaleString()}{" "}
                 <span className="text-xs text-muted-foreground font-sans font-medium uppercase ml-1">
-                  Total Reach
+                  {record.unit === "Person" ? "Total Reach" : record.unit}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">Male</p>
-                  <p className="text-lg font-bold">{record.beneficiary_male}</p>
-                </div>
-                <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">Male %</p>
-                  <p className="text-lg font-bold">{record.beneficiary_male_percentage ?? "0.0"}%</p>
-                </div>
-                
-                <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">Female</p>
-                  <p className="text-lg font-bold">{record.beneficiary_female}</p>
-                </div>
-                <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">Female %</p>
-                  <p className="text-lg font-bold">{record.beneficiary_female_percentage ?? "0.0"}%</p>
-                </div>
+              
+              {record.unit === "Person" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">Male</p>
+                    <p className="text-lg font-bold">{record.beneficiary_male}</p>
+                  </div>
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">Male %</p>
+                    <p className="text-lg font-bold">{record.beneficiary_male_percentage ?? "0.0"}%</p>
+                  </div>
+                  
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">Female</p>
+                    <p className="text-lg font-bold">{record.beneficiary_female}</p>
+                  </div>
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">Female %</p>
+                    <p className="text-lg font-bold">{record.beneficiary_female_percentage ?? "0.0"}%</p>
+                  </div>
 
-                <div className="border-l-2 border-rose-300 pl-3 bg-rose-50/50 p-2 rounded-r-lg">
-                  <p className="text-[10px] font-bold text-rose-600">Youth (&lt;35)</p>
-                  <p className="text-lg font-bold text-rose-700">{record.beneficiary_youth_under35 ?? 0}</p>
+                  <div className="border-l-2 border-rose-300 pl-3 bg-rose-50/50 p-2 rounded-r-lg">
+                    <p className="text-[10px] font-bold text-rose-600">Youth (&lt;35)</p>
+                    <p className="text-lg font-bold text-rose-700">{record.beneficiary_youth_under35 ?? 0}</p>
+                  </div>
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">Youth %</p>
+                    <p className="text-lg font-bold">{record.beneficiary_youth_percentage ?? "0.0"}%</p>
+                  </div>
                 </div>
-                <div className="border-l-2 border-rose-200 pl-3">
-                  <p className="text-[10px] font-bold text-muted-foreground">Youth %</p>
-                  <p className="text-lg font-bold">{record.beneficiary_youth_percentage ?? "0.0"}%</p>
+              )}
+
+              {record.unit !== "Person" && (
+                <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-100 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Metric Summary</p>
+                    <p className="text-sm font-medium text-rose-800">
+                      Physical achievement recorded in <span className="font-bold underline">{record.unit}</span>.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -562,7 +610,7 @@ export default function RecordDetails() {
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block">
                   M&E Backend Supporting Documents
                 </label>
-                {record.supporting_documents.length > 0 ? (
+                {Array.isArray(record.supporting_documents) && record.supporting_documents.length > 0 ? (
                   record.supporting_documents.map((doc, idx) => (
                     <div
                       key={idx}
@@ -574,7 +622,7 @@ export default function RecordDetails() {
                   ))
                 ) : (
                   <div className="text-xs text-muted-foreground italic p-2 border border-dashed rounded">
-                    No documents attached.
+                    {typeof record.supporting_documents === 'string' ? record.supporting_documents : "No documents attached."}
                   </div>
                 )}
               </div>

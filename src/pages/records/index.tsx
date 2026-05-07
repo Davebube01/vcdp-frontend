@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Search,
   Calendar,
+  Pencil,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -60,9 +61,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/core/providers/AuthProvider";
+import { useCurrency } from "@/core/providers/CurrencyProvider";
 
 export default function Records() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { formatValue } = useCurrency();
   const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
 
   const [page, setPage] = useState(1);
@@ -184,6 +187,15 @@ export default function Records() {
       ),
     },
     {
+      accessorKey: "executing_agency",
+      header: "Agency",
+      cell: ({ row }) => (
+        <span className="text-[10px] font-bold text-orange-600 uppercase truncate max-w-[120px] block" title={row.original.executing_agency || ""}>
+          {row.original.executing_agency || "N/A"}
+        </span>
+      ),
+    },
+    {
       accessorKey: "fy_awarded",
       header: "FY",
       cell: ({ row }) => (
@@ -193,18 +205,22 @@ export default function Records() {
     {
       accessorKey: "vcdp_component",
       header: "Component",
-      cell: ({ row }) => (
-        <span className="text-xs uppercase font-semibold text-slate-500">
-          {row.original.vcdp_component?.join(", ")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const val = row.original.vcdp_component;
+        const displayVal = Array.isArray(val) ? val.join(", ") : (val || "N/A");
+        return (
+          <span className="text-xs uppercase font-semibold text-slate-500 truncate max-w-[250px] block">
+            {displayVal}
+          </span>
+        );
+      },
     },
     {
       accessorKey: "expenditure_total",
-      header: () => <div className="text-right">Expenditure (USD)</div>,
+      header: () => <div className="text-right">Total Expenditure</div>,
       cell: ({ row }) => (
         <div className="text-right font-bold text-primary">
-          ${row.original.expenditure_total.toLocaleString()}
+          {formatValue(row.original.expenditure_total, row.original.currency as any)}
         </div>
       ),
     },
@@ -238,11 +254,18 @@ export default function Records() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" asChild>
-          <Link to={`/submissions/${row.original.id}`}>
-            <ExternalLink className="w-4 h-4" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" asChild title="View Details">
+            <Link to={`/submissions/${row.original.id}`}>
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" asChild title="Edit Record" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+            <Link to={`/submissions/${row.original.id}/edit`}>
+              <Pencil className="w-4 h-4" />
+            </Link>
+          </Button>
+        </div>
       ),
     },
   ];
@@ -254,7 +277,7 @@ export default function Records() {
   });
 
   const handleExport = () => {
-    window.open(recordsApi.exportExcel(queryParams), "_blank");
+    window.open(recordsApi.exportCsv(queryParams), "_blank");
   };
 
   return (
@@ -538,7 +561,7 @@ export default function Records() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
         <Table>
           <TableHeader className="bg-muted/30">
             {table.getHeaderGroups().map((headerGroup) => (

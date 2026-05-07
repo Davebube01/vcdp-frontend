@@ -41,6 +41,7 @@ import {
   useThreefsComponents,
 } from "@/core/services/loaders/meta-loaders";
 import { useDashboardMetrics } from "@/core/services/loaders/dashboard-loaders";
+import { useCurrency } from "@/core/providers/CurrencyProvider";
 import { recordsApi } from "@/core/services/API/records";
 import {
   Select,
@@ -49,6 +50,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Sheet,
   SheetContent,
@@ -73,6 +80,7 @@ const COLORS = [
 
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { formatValue, getSymbol } = useCurrency();
   const { user } = useAuth();
   const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
 
@@ -444,16 +452,27 @@ export default function Dashboard() {
             <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
               Total Expenditure
             </CardTitle>
-            <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-              <DollarSign className="h-4 w-4" />
+            <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-colors w-8 h-8 flex items-center justify-center font-bold">
+              {getSymbol()}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-display font-bold text-foreground">
-              ${metrics?.kpis.total_expenditure.toLocaleString()}
-            </div>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="text-2xl font-display font-bold text-foreground cursor-help">
+                    {formatValue(metrics?.kpis?.total_expenditure || 0, "USD", true)}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-mono font-bold">
+                    {formatValue(metrics?.kpis?.total_expenditure || 0)}
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
             <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1 font-bold">
-              <TrendingUp className="w-3 h-3" /> Cumulative (USD)
+              <TrendingUp className="w-3 h-3" /> Cumulative
             </p>
           </CardContent>
         </Card>
@@ -469,7 +488,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold">
-              {metrics?.kpis.active_states}
+              {metrics?.kpis?.active_states || 0}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
               Participating core states
@@ -488,7 +507,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold">
-              {metrics?.kpis.total_transactions}
+              {metrics?.kpis?.total_transactions || 0}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
               Verified transaction records
@@ -507,7 +526,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold">
-              {metrics?.kpis.climate_flagged_pct.toFixed(1)}%
+              {(metrics?.kpis?.climate_flagged_pct || 0).toFixed(1)}%
             </div>
             <p className="text-[10px] text-emerald-600 mt-1 font-bold">
               Climate-flagged activities
@@ -550,8 +569,8 @@ export default function Dashboard() {
                   fontWeight={600}
                   axisLine={false}
                   tickLine={false}
-                  width={35}
-                  tickFormatter={(val) => `₦${(val / 1000).toLocaleString()}k`}
+                  width={60}
+                  tickFormatter={(val) => formatValue(val, "USD", true)}
                 />
                 <Tooltip
                   contentStyle={{
@@ -560,7 +579,7 @@ export default function Dashboard() {
                     boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
                   }}
                   formatter={(val: number) => [
-                    `$${val.toLocaleString()}`,
+                    formatValue(val, "USD"),
                     "Expenditure",
                   ]}
                 />
@@ -617,7 +636,7 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(val: number) => `₦${val.toLocaleString()}`}
+                  formatter={(val: number) => formatValue(val, "USD")}
                 />
                 <Legend
                   layout="horizontal"
@@ -668,7 +687,7 @@ export default function Dashboard() {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(val: number) => `₦${val.toLocaleString()}`}
+                  formatter={(val: number) => formatValue(val, "USD")}
                 />
                 <Bar
                   dataKey="value"
@@ -709,11 +728,11 @@ export default function Dashboard() {
                   axisLine={false}
                   tickLine={false}
                   fontSize={10}
-                  width={35}
-                  tickFormatter={(val) => `₦${(val / 1000).toLocaleString()}k`}
+                  width={60}
+                  tickFormatter={(val) => formatValue(val, "USD", true)}
                 />
                 <Tooltip
-                  formatter={(val: number) => `₦${val.toLocaleString()}`}
+                  formatter={(val: number) => formatValue(val, "USD")}
                 />
                 <Bar
                   dataKey="value"

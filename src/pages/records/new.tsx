@@ -44,6 +44,7 @@ import {
 import { useCreateRecordAction } from "@/core/services/actions/record-actions";
 import { useDocuments } from "@/core/services/loaders/documents-loaders";
 import { useProjects } from "@/core/services/loaders/project-loaders";
+import { useInstitutions } from "@/core/services/loaders/institution-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -65,13 +66,14 @@ import { useAuth } from "@/core/providers/AuthProvider";
 
 const formSchema = z
   .object({
-    ref_id: z.string().min(1, "Ref ID is required"),
-    project_name: z.string().min(1, "Project Name is required"),
+    ref_id: z.string().optional(),
+    project_name: z.string().min(1, "Activity Name is required"),
+    activity_type_code: z.string().optional(),
     commodity: z.array(z.string()).min(1, "At least one commodity required"),
     fy_awarded: z.string().min(1, "FY Awarded is required"),
     fy_completed: z.string().min(1, "FY Completed is required"),
     programme_phase: z.string(),
-    fiscal_quarter: z.string().min(1, "Fiscal Quarter is required"),
+    fiscal_quarter: z.array(z.string()).min(1, "At least one quarter required"),
     vcdp_component: z.array(z.string()).min(1, "At least one VCDP Component is required"),
     vcdp_sub_components: z
       .array(z.string())
@@ -82,31 +84,48 @@ const formSchema = z
       .array(z.string())
       .min(1, "At least one 3FS Primary required"),
     threeFS_sub_components: z.array(z.string()),
-    cofog_code: z.string().optional(),
+    cofog_divisions: z.array(z.string()),
+    cofog_groups: z.array(z.string()),
     funding_sources: z
       .array(z.string())
       .min(1, "At least one funding source required"),
     sub_funding_sources: z.array(z.string()),
+    sub_funding_oof_text: z.string().optional(),
+    sub_funding_private_text: z.string().optional(),
+    sub_funding_value_chain_text: z.string().optional(),
     expenditure_fgn: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     expenditure_state: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     expenditure_ifad: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_ifad_loan: z
+      .union([z.coerce.number().min(0), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_ifad_grant: z
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     expenditure_oof: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     expenditure_beneficiary: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     expenditure_other: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_private_sector: z
+      .union([z.coerce.number().min(0), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    expenditure_value_chain: z
+      .union([z.coerce.number().min(0), z.string().length(0)])
+      .transform((v) => (v === "" ? 0 : Number(v))),
+    currency: z.enum(["USD", "NGN"]),
     expenditure_total_reported: z
-      .union([z.coerce.number(), z.string().length(0)])
+      .union([z.coerce.number().min(0, "Must be non-negative"), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
     beneficiary_categories: z.array(z.string()),
     beneficiary_total: z
@@ -124,47 +143,42 @@ const formSchema = z
     beneficiary_plwd: z
       .union([z.coerce.number(), z.string().length(0)])
       .transform((v) => (v === "" ? 0 : Number(v))),
+    unit: z.string().min(1, "Unit is required"),
+    quarterly_beneficiary_data: z.record(
+      z.string(),
+      z.object({
+        total: z.number().default(0),
+        male: z.number().default(0),
+        female: z.number().default(0),
+        youth: z.number().default(0),
+        plwd: z.number().default(0),
+      })
+    ).optional(),
     value_chain_segments: z.array(z.string()),
+    value_chain_segments_other: z.string().optional(),
     climate_flag: z.boolean(),
     data_source: z
       .array(z.string())
       .min(1, "At least one Data Source required"),
     supporting_documents: z.array(z.string()),
     classification_notes: z.string().max(200).optional(),
+    executing_agency: z.string().min(1, "Institution Name is required"),
+    institution_code: z.string().min(1, "Institution Code is required"),
     status: z.enum(["PENDING", "REJECTED", "DRAFT", "PUBLISHED"]).optional(),
   })
   .refine(
     (data) => {
       const fy_completed = parseInt(data.fy_completed);
       const fy_awarded = parseInt(data.fy_awarded);
+      if (isNaN(fy_completed) || isNaN(fy_awarded)) return true;
       return fy_completed >= fy_awarded;
     },
     {
       message: "FY Completed cannot be before FY Awarded",
       path: ["fy_completed"],
     },
-  )
-  .refine(
-    (data) => {
-      return (
-        data.beneficiary_male + data.beneficiary_female ===
-        data.beneficiary_total
-      );
-    },
-    {
-      message: "Male + Female headcount must equal Total Headcount",
-      path: ["beneficiary_total"],
-    },
-  )
-  .refine(
-    (data) => {
-      return data.beneficiary_youth_under35 <= data.beneficiary_total;
-    },
-    {
-      message: "Youth headcount cannot exceed Total Headcount",
-      path: ["beneficiary_youth_under35"],
-    },
   );
+// Dynamic institutions will be fetched via hook
 
 export default function NewRecord() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -187,26 +201,37 @@ export default function NewRecord() {
     defaultValues: {
       ref_id: "",
       project_name: "",
+      activity_type_code: "",
       commodity: [],
       fy_awarded: "",
       fy_completed: "",
       programme_phase: "VCDP Phase II",
-      fiscal_quarter: "",
+      fiscal_quarter: [],
+      unit: "Person",
+      quarterly_beneficiary_data: {},
       vcdp_component: [],
       vcdp_sub_components: [],
       state: isNationalAdmin ? "" : user?.state || "",
       lgas: [],
       threeFS_primary: [],
       threeFS_sub_components: [],
-      cofog_code: "",
+      cofog_divisions: [],
+      cofog_groups: [],
       funding_sources: [],
       sub_funding_sources: [],
+      sub_funding_oof_text: "",
+      sub_funding_private_text: "",
+      sub_funding_value_chain_text: "",
       expenditure_fgn: "" as any,
       expenditure_state: "" as any,
       expenditure_ifad: "" as any,
+      expenditure_ifad_loan: "" as any,
+      expenditure_ifad_grant: "" as any,
       expenditure_oof: "" as any,
       expenditure_beneficiary: "" as any,
       expenditure_other: "" as any,
+      expenditure_private_sector: "" as any,
+      expenditure_value_chain: "" as any,
       expenditure_total_reported: "" as any,
       beneficiary_categories: [],
       beneficiary_total: "" as any,
@@ -215,15 +240,23 @@ export default function NewRecord() {
       beneficiary_youth_under35: "" as any,
       beneficiary_plwd: "" as any,
       value_chain_segments: [],
+      value_chain_segments_other: "",
       climate_flag: false,
       data_source: [],
       supporting_documents: [],
       classification_notes: "",
+      executing_agency: "",
+      institution_code: "",
+      currency: "USD",
       status: isNationalAdmin ? "PUBLISHED" : "PENDING",
     },
   });
 
+  const { setValue, getValues, control } = form;
+
   const watchedValues = useWatch({ control: form.control });
+
+  const { data: institutionsList } = useInstitutions(watchedValues.state);
 
   // Sync state for non-admins if it's empty
   useEffect(() => {
@@ -281,16 +314,22 @@ export default function NewRecord() {
   ]);
 
   // Logic: Expenditure Total (Display only)
+  const ifadTotal = useMemo(() => {
+    return (Number(watchedValues.expenditure_ifad_loan) || 0) + (Number(watchedValues.expenditure_ifad_grant) || 0);
+  }, [watchedValues.expenditure_ifad_loan, watchedValues.expenditure_ifad_grant]);
+
   const totalExpenditure = useMemo(() => {
     return (
       (Number(watchedValues.expenditure_fgn) || 0) +
       (Number(watchedValues.expenditure_state) || 0) +
-      (Number(watchedValues.expenditure_ifad) || 0) +
+      ifadTotal +
       (Number(watchedValues.expenditure_oof) || 0) +
       (Number(watchedValues.expenditure_beneficiary) || 0) +
+      (Number(watchedValues.expenditure_private_sector) || 0) +
+      (Number(watchedValues.expenditure_value_chain) || 0) +
       (Number(watchedValues.expenditure_other) || 0)
     );
-  }, [watchedValues]);
+  }, [watchedValues, ifadTotal]);
 
   // Logic: Filtered LGAs
   const filteredLGAs = useMemo(() => {
@@ -300,7 +339,8 @@ export default function NewRecord() {
     const selectedState = states?.find(
       (s) => s.name.toLowerCase() === selectedStateName.toLowerCase(),
     );
-    return selectedState?.lgas.map((l) => l.name) || [];
+    const lgas = selectedState?.lgas.map((l) => l.name) || [];
+    return ["All LGAs", ...lgas];
   }, [watchedValues.state, states]);
 
   // Logic: Filtered VCDP Sub-Components
@@ -352,6 +392,28 @@ export default function NewRecord() {
     );
   }, [watchedValues.funding_sources, fundMeta]);
 
+  // COFOG data structure
+  const cofogMeta: Record<string, string[]> = {
+    "Economic Affairs": [
+      "Agriculture, forestry, fishing and hunting",
+    ],
+    "Environmental Protection": [
+      "Waste management",
+      "Pollution abatement",
+      "Protection of biodiversity and landscape",
+    ],
+  };
+
+  // Logic: Filtered COFOG Groups based on selected divisions
+  const filteredCofogGroups = useMemo(() => {
+    const selectedDivisions = watchedValues.cofog_divisions || [];
+    if (selectedDivisions.length === 0) return [];
+    return selectedDivisions.flatMap(
+      (division) => cofogMeta[division] || [],
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedValues.cofog_divisions]);
+
   const createRecordMutation = useCreateRecordAction();
 
   const fieldLabels: Record<string, string> = {
@@ -396,22 +458,41 @@ export default function NewRecord() {
       return;
     }
 
-    const t = Number(values.beneficiary_total) || 0;
-    const m = Number(values.beneficiary_male) || 0;
-    const f = Number(values.beneficiary_female) || 0;
-    const y = Number(values.beneficiary_youth_under35) || 0;
-    const p = Number(values.beneficiary_plwd) || 0;
-
-    const payload = {
+    const payload: any = {
       ...values,
       fy_awarded: parseInt(values.fy_awarded),
       fy_completed: parseInt(values.fy_completed),
       climate_flag: values.climate_flag ? "Yes" : "No",
-      beneficiary_male_percentage: t > 0 ? parseFloat(((m / t) * 100).toFixed(1)) : 0,
-      beneficiary_female_percentage: t > 0 ? parseFloat(((f / t) * 100).toFixed(1)) : 0,
-      beneficiary_youth_percentage: t > 0 ? parseFloat(((y / t) * 100).toFixed(1)) : 0,
-      beneficiary_plwd: p,
+      expenditure_ifad: (Number(values.expenditure_ifad_loan) || 0) + (Number(values.expenditure_ifad_grant) || 0),
     };
+
+    // Aggregate quarterly data into top-level fields if not "All Quarters"
+    if (!values.fiscal_quarter.includes("All Quarters") && values.quarterly_beneficiary_data) {
+      let total = 0, male = 0, female = 0, youth = 0, plwd = 0;
+      Object.values(values.quarterly_beneficiary_data).forEach((q: any) => {
+        total += Number(q.total) || 0;
+        male += Number(q.male) || 0;
+        female += Number(q.female) || 0;
+        youth += Number(q.youth) || 0;
+        plwd += Number(q.plwd) || 0;
+      });
+      payload.beneficiary_total = total;
+      payload.beneficiary_male = male;
+      payload.beneficiary_female = female;
+      payload.beneficiary_youth_under35 = youth;
+      payload.beneficiary_plwd = plwd;
+    }
+
+    const t = Number(payload.beneficiary_total) || 0;
+    const m = Number(payload.beneficiary_male) || 0;
+    const f = Number(payload.beneficiary_female) || 0;
+    const y = Number(payload.beneficiary_youth_under35) || 0;
+    
+    if (t > 0) {
+      payload.beneficiary_male_percentage = parseFloat(((m / t) * 100).toFixed(1));
+      payload.beneficiary_female_percentage = parseFloat(((f / t) * 100).toFixed(1));
+      payload.beneficiary_youth_percentage = parseFloat(((y / t) * 100).toFixed(1));
+    }
 
     createRecordMutation.mutate(payload, {
       onSuccess: () => {
@@ -463,7 +544,7 @@ export default function NewRecord() {
           className="space-y-8 pb-20"
         >
           {/* SECTION 1: Identifiers */}
-          <Card className="glass-card shadow-sm border-l-4 border-l-blue-500 relative">
+          <Card className="glass-card shadow-sm border-l-4 border-l-blue-500 relative z-50">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
@@ -475,84 +556,96 @@ export default function NewRecord() {
                 Core identifiers for the VCDP transaction.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="ref_id"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Project Reference Number/Transaction ID <span className="text-red-500">*</span></FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between bg-white text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value
-                              ? projectsList?.find((p) => p.ref_id === field.value)?.ref_id || field.value
-                              : "Select Project"}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                        <Command>
-                          <CommandInput placeholder="Search projects..." />
-                          <CommandList>
-                            <CommandEmpty>No project found.</CommandEmpty>
-                            <CommandGroup>
-                              {projectsList?.map((p) => (
-                                <CommandItem
-                                  value={p.ref_id}
-                                  key={p.id}
-                                  onSelect={() => {
-                                    form.setValue("ref_id", p.ref_id);
-                                    form.setValue("project_name", p.name);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      p.ref_id === field.value
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {p.ref_id} - {p.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="project_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Name/Specific Activity Name <span className="text-red-500">*</span></FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Auto-filled from project selection"
-                        {...field}
-                        readOnly
-                        className="bg-slate-50 text-muted-foreground cursor-not-allowed"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="ref_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Transaction ID / Ref</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. VCDP/INV/001" {...field} className="bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="activity_type_code"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Activity Type/Code</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between bg-white text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value
+                                ? projectsList?.find((p) => p.activity_type_code === field.value)?.activity_type_code || field.value
+                                : "Search Activity Code/Name"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search activity code or name..." />
+                            <CommandList>
+                              <CommandEmpty>No activity found.</CommandEmpty>
+                              <CommandGroup>
+                                {projectsList?.map((p) => (
+                                  <CommandItem
+                                    value={`${p.activity_type_code} ${p.name}`}
+                                    key={p.id}
+                                    onSelect={() => {
+                                      form.setValue("activity_type_code", p.activity_type_code);
+                                      form.setValue("project_name", p.name);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        p.activity_type_code === field.value ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <span className="font-mono font-bold mr-2">{p.activity_type_code}</span> - {p.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="project_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Activity Name (Full) <span className="text-red-500">*</span></FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Search above or type activity name"
+                          {...field}
+                          className="bg-white"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="commodity"
@@ -702,6 +795,7 @@ export default function NewRecord() {
                   )}
                 />
               </div>
+              
               <FormField
                 control={form.control}
                 name="programme_phase"
@@ -751,23 +845,31 @@ export default function NewRecord() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fiscal Quarter <span className="text-red-500">*</span></FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Quarter" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {["Q1", "Q2", "Q3", "Q4"].map((q) => (
-                          <SelectItem key={q} value={q}>
-                            {q}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <MultiSelect
+                        options={["Q1", "Q2", "Q3", "Q4", "All Quarters"]}
+                        selected={field.value}
+                        onChange={(vals) => {
+                          if (vals.includes("All Quarters")) {
+                            // If All Quarters was just selected, or already exists, ensure it's exclusive
+                            const previouslyAll = field.value.includes("All Quarters");
+                            if (!previouslyAll) {
+                              field.onChange(["All Quarters"]);
+                            } else {
+                              const withoutAll = vals.filter(v => v !== "All Quarters");
+                              if (withoutAll.length > 0) {
+                                field.onChange(withoutAll);
+                              } else {
+                                field.onChange(["All Quarters"]);
+                              }
+                            }
+                          } else {
+                            field.onChange(vals);
+                          }
+                        }}
+                        placeholder="Select Quarter(s)"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -923,6 +1025,38 @@ export default function NewRecord() {
                 />
                 <FormField
                   control={form.control}
+                  name="executing_agency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Institution / Executing Agency</FormLabel>
+                      <Select
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          const inst = institutionsList?.find(i => i.name === val);
+                          if (inst) form.setValue("institution_code", inst.code);
+                        }}
+                        value={field.value}
+                        disabled={!watchedValues.state}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder={watchedValues.state ? "Select Institution" : "Select state first"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {institutionsList?.map((inst) => (
+                            <SelectItem key={inst.id} value={inst.name}>
+                              {inst.code} - {inst.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="lgas"
                   render={({ field }) => (
                     <FormItem>
@@ -931,7 +1065,23 @@ export default function NewRecord() {
                         <MultiSelect
                           options={filteredLGAs}
                           selected={field.value}
-                          onChange={field.onChange}
+                          onChange={(vals) => {
+                            if (vals.includes("All LGAs")) {
+                              const previouslyAll = field.value.includes("All LGAs");
+                              if (!previouslyAll) {
+                                field.onChange(["All LGAs"]);
+                              } else {
+                                const withoutAll = vals.filter(v => v !== "All LGAs");
+                                if (withoutAll.length > 0) {
+                                  field.onChange(withoutAll);
+                                } else {
+                                  field.onChange(["All LGAs"]);
+                                }
+                              }
+                            } else {
+                              field.onChange(vals);
+                            }
+                          }}
                           placeholder="Select LGAs"
                           disabled={!watchedValues.state}
                         />
@@ -989,18 +1139,110 @@ export default function NewRecord() {
                     </FormItem>
                   )}
                 />
+                {/* Free-text: OOF description */}
+                {watchedValues.sub_funding_sources?.includes("Other Official Flows (OOF)") && (
+                  <FormField
+                    control={form.control}
+                    name="sub_funding_oof_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm text-muted-foreground">
+                          Other Official Flows (OOF) – specify source
+                          <span className="ml-1 text-xs italic">(e.g. JICA)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. JICA" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {/* Free-text: Private Sector Financing */}
+                {watchedValues.funding_sources?.includes("Private Sector Financing") && (
+                  <FormField
+                    control={form.control}
+                    name="sub_funding_private_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm text-muted-foreground">
+                          Private Sector Financing – specify source
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="Describe the private sector funding source" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {/* Free-text: Value Chain Financing */}
+                {watchedValues.funding_sources?.includes("Value Chain Financing") && (
+                  <FormField
+                    control={form.control}
+                    name="sub_funding_value_chain_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm text-muted-foreground">
+                          Value Chain Financing – specify source
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="Describe the value chain financing source" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
-                  name="cofog_code"
+                  name="cofog_divisions"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>COFOG Code</FormLabel>
+                      <FormLabel>COFOG Division</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. 70421" {...field} />
+                        <MultiSelect
+                          options={Object.keys(cofogMeta)}
+                          selected={field.value}
+                          onChange={(vals) => {
+                            field.onChange(vals);
+                            // Reset groups when divisions change
+                            const currentGroups = form.getValues("cofog_groups");
+                            const newAllowed = vals.flatMap(
+                              (d) => cofogMeta[d] || [],
+                            );
+                            form.setValue(
+                              "cofog_groups",
+                              currentGroups.filter((g) =>
+                                newAllowed.includes(g),
+                              ),
+                            );
+                          }}
+                          placeholder="Select Division(s)"
+                        />
                       </FormControl>
                       <FormDescription>
                         Classification of the Functions of Government
                       </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cofog_groups"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>COFOG Group / Sub-Category</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={filteredCofogGroups}
+                          selected={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Group(s)"
+                          disabled={!watchedValues.cofog_divisions?.length}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1016,10 +1258,35 @@ export default function NewRecord() {
                 <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm shadow-md">
                   5
                 </span>
-                Grant Details (USD) 
+                Grant Details ({watchedValues.currency}) 
               </h3>
             </div>
             <CardContent className="pt-8">
+              <div className="flex flex-col md:flex-row gap-6 mb-8 p-4 bg-muted/30 rounded-xl border border-muted-foreground/10">
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel className="flex items-center gap-2 font-bold text-foreground">
+                        Input Currency
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select Currency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                          <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 <div className="bg-slate-900 text-white rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                   <div>
@@ -1027,7 +1294,7 @@ export default function NewRecord() {
                       Allocated Budget
                     </p>
                     <p className="text-4xl font-display font-bold mt-1">
-                      $
+                      {watchedValues.currency === "NGN" ? "₦" : "$"}
                       {totalExpenditure.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                       })}
@@ -1046,7 +1313,7 @@ export default function NewRecord() {
                       Total Expenditure (Reported)
                     </p>
                     <p className="text-4xl font-display font-bold mt-1 text-purple-400">
-                      $
+                      {watchedValues.currency === "NGN" ? "₦" : "$"}
                       {(
                         watchedValues.expenditure_total_reported || 0
                       ).toLocaleString(undefined, {
@@ -1057,205 +1324,259 @@ export default function NewRecord() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <FormField
-                  control={form.control}
-                  name="expenditure_ifad"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        IFAD Contribution{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expenditure_fgn"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        FGN Budget{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expenditure_state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        State/LGA{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expenditure_beneficiary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        Beneficiary{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expenditure_oof"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        IFAD OOF{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expenditure_other"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        Other / Private{" "}
-                        <span className="text-[10px] text-muted-foreground uppercase">
-                          USD
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="space-y-8 mb-8">
+                {/* Group 1: IFAD Financing */}
+                <div className="p-6 rounded-xl bg-blue-50/50 border border-blue-100">
+                  <h4 className="text-sm font-bold uppercase text-blue-700 mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    IFAD Financing (ODA)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <FormField
+                      control={form.control}
+                      name="expenditure_ifad_loan"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IFAD Loan ({watchedValues.currency})</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="expenditure_ifad_grant"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IFAD Grant ({watchedValues.currency})</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="p-3 bg-white rounded-lg border border-blue-200 flex justify-between items-center h-10">
+                      <span className="text-xs font-bold text-blue-600">Total IFAD:</span>
+                      <span className="font-display font-bold text-blue-700">
+                        {watchedValues.currency === "NGN" ? "₦" : "$"}
+                        {ifadTotal.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Group 2: Government & Community */}
+                <div className="p-6 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                  <h4 className="text-sm font-bold uppercase text-emerald-700 mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Government & Community Contributions
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="expenditure_fgn"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>FGN Budget ({watchedValues.currency})</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="expenditure_state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State/LGA ({watchedValues.currency})</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="expenditure_beneficiary"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Beneficiary ({watchedValues.currency})</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Group 3: Special & Private Financing */}
+                <div className="p-6 rounded-xl bg-purple-50/50 border border-purple-100">
+                  <h4 className="text-sm font-bold uppercase text-purple-700 mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    Special & Private Financing
+                  </h4>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                      <FormField
+                        control={form.control}
+                        name="expenditure_oof"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>IFAD OOF (USD)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                {...field}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                  field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sub_funding_oof_text"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>OOF Description (Free Text)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Details about OOF..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                      <FormField
+                        control={form.control}
+                        name="expenditure_private_sector"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Private Sector Financing (USD)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                {...field}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                  field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sub_funding_private_text"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Private Sector Details (Free Text)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Company name, sector, etc..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                      <FormField
+                        control={form.control}
+                        name="expenditure_value_chain"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Value Chain Financing (USD)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                {...field}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                  field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sub_funding_value_chain_text"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Value Chain Details (Free Text)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Specific segment or activity..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
                 <FormField
                   control={form.control}
                   name="expenditure_total_reported"
@@ -1291,7 +1612,6 @@ export default function NewRecord() {
                     </FormItem>
                   )}
                 />
-              </div>
             </CardContent>
           </Card>
 
@@ -1307,23 +1627,40 @@ export default function NewRecord() {
             </CardHeader>
             <CardContent className="space-y-6 overflow-visible">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="value_chain_segments"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Value Chain Segment(s)</FormLabel>
-                      <FormControl>
-                        <MultiSelect
-                          options={segments || []}
-                          selected={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="value_chain_segments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Value Chain Segment(s)</FormLabel>
+                        <FormControl>
+                          <MultiSelect
+                            options={segments || []}
+                            selected={field.value}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {watchedValues.value_chain_segments?.includes("Others") && (
+                    <FormField
+                      control={form.control}
+                      name="value_chain_segments_other"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Other Value Chain Segment(s)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Specify other segments..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
+                </div>
                 <FormField
                   control={form.control}
                   name="data_source"
@@ -1332,12 +1669,18 @@ export default function NewRecord() {
                       <FormLabel>Data Source</FormLabel>
                       <MultiSelect
                         options={[
-                          "Financial report",
-                          "Audit report",
-                          "Procurement record",
-                          "Beneficiary database",
-                          "AWPB excerpts",
-                          "Bank statements",
+                          "Administrative documents (HR/Training reports)",
+                          "Audit documents (Internal audit reports)",
+                          "Financial documents (Bank statements, Invoices, SEOs, Memos)",
+                          "Procurement: Goods",
+                          "Procurement: Works",
+                          "Procurement: Consulting services",
+                          "Inventory documents (Asset registers, etc.)",
+                          "M&E documents (AWPB, Studies, Supervision reports)",
+                          "Correspondence",
+                          "Beneficiary data",
+                          "Technical reports",
+                          "Annual reports",
                           "Geographic/location data",
                         ]}
                         selected={field.value || []}
@@ -1361,14 +1704,44 @@ export default function NewRecord() {
                 </span>
                 Beneficiary Data
               </CardTitle>
+              <CardDescription>
+                Breakdown of beneficiaries or quantities per selected quarter.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-8">
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit of Measurement <span className="text-red-500">*</span></FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Unit" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {["Person", "Number", "Ha", "Km", "Kg", "Centres"].map((u) => (
+                          <SelectItem key={u} value={u}>
+                            {u}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="beneficiary_categories"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Beneficiary Categories <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>Beneficiary Categories</FormLabel>
                     <FormControl>
                       <MultiSelect
                         options={[
@@ -1381,196 +1754,147 @@ export default function NewRecord() {
                         ]}
                         selected={field.value}
                         onChange={field.onChange}
-                        
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                <FormField
-                  control={form.control}
-                  name="beneficiary_total"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Headcount <span className="text-red-500">*</span></FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Strip leading zeros unless it's just "0"
-                            const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                            field.onChange(
-                              cleanVal === ""
-                                ? ""
-                                : val.startsWith("0") && val.length > 1
-                                  ? Number(cleanVal)
-                                  : val,
-                            );
-                          }}
+
+              {watchedValues.fiscal_quarter?.length === 0 ? (
+                <div className="p-8 border-2 border-dashed rounded-xl text-center text-muted-foreground bg-slate-50">
+                  Please select at least one Fiscal Quarter in Section 1 to enter beneficiary data.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {watchedValues.fiscal_quarter?.map((quarter) => (
+                    <div key={quarter} className="p-6 border rounded-xl bg-slate-50/50 space-y-6 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-rose-400" />
+                      <h4 className="font-bold text-rose-700 flex items-center gap-2">
+                        {quarter === "All Quarters" ? "Cumulative Total" : `Quarterly Data: ${quarter}`}
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <FormField
+                          control={form.control}
+                          // We use the top-level fields for the "first" or "All" case to maintain compatibility,
+                          // but for multi-quarter we should use the quarterly_beneficiary_data
+                          name={quarter === "All Quarters" || watchedValues.fiscal_quarter?.length === 1 ? "beneficiary_total" : `quarterly_beneficiary_data.${quarter}.total` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{watchedValues.unit === "Person" ? "Total Headcount" : "Total Quantity"} <span className="text-red-500">*</span></FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                    field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="beneficiary_male"
-                  render={({ field }) => {
-                    const total = Number(watchedValues.beneficiary_total) || 0;
-                    const male = Number(field.value) || 0;
-                    const percentage = total > 0 ? ((male / total) * 100).toFixed(1) : "0.0";
-                    return (
-                      <FormItem>
-                        <FormLabel>Male</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              // Strip leading zeros unless it's just "0"
-                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                              field.onChange(
-                                cleanVal === ""
-                                  ? ""
-                                  : val.startsWith("0") && val.length > 1
-                                    ? Number(cleanVal)
-                                    : val,
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        {total > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1 font-medium">
-                            {percentage}% of Total Headcount
-                          </p>
+
+                        {watchedValues.unit === "Person" && (
+                          <>
+                            <FormField
+                              control={form.control}
+                              name={quarter === "All Quarters" || watchedValues.fiscal_quarter?.length === 1 ? "beneficiary_male" : `quarterly_beneficiary_data.${quarter}.male` as any}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Male</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                        field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={quarter === "All Quarters" || watchedValues.fiscal_quarter?.length === 1 ? "beneficiary_female" : `quarterly_beneficiary_data.${quarter}.female` as any}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Female</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                        field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={quarter === "All Quarters" || watchedValues.fiscal_quarter?.length === 1 ? "beneficiary_youth_under35" : `quarterly_beneficiary_data.${quarter}.youth` as any}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Youth (Under 35)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                        field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={quarter === "All Quarters" || watchedValues.fiscal_quarter?.length === 1 ? "beneficiary_plwd" : `quarterly_beneficiary_data.${quarter}.plwd` as any}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>PLWD</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const cleanVal = val.replace(/^0+(?=[1-9])/, "");
+                                        field.onChange(cleanVal === "" ? "" : Number(cleanVal));
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
                         )}
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-                <FormField
-                  control={form.control}
-                  name="beneficiary_female"
-                  render={({ field }) => {
-                    const total = Number(watchedValues.beneficiary_total) || 0;
-                    const female = Number(field.value) || 0;
-                    const percentage = total > 0 ? ((female / total) * 100).toFixed(1) : "0.0";
-                    return (
-                      <FormItem>
-                        <FormLabel>Female</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              // Strip leading zeros unless it's just "0"
-                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                              field.onChange(
-                                cleanVal === ""
-                                  ? ""
-                                  : val.startsWith("0") && val.length > 1
-                                    ? Number(cleanVal)
-                                    : val,
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        {total > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1 font-medium">
-                            {percentage}% of Total Headcount
-                          </p>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-                <FormField
-                  control={form.control}
-                  name="beneficiary_youth_under35"
-                  render={({ field }) => {
-                    const total = Number(watchedValues.beneficiary_total) || 0;
-                    const youth = Number(field.value) || 0;
-                    const percentage = total > 0 ? ((youth / total) * 100).toFixed(1) : "0.0";
-                    return (
-                      <FormItem>
-                        <FormLabel>Youth (&lt;35)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              // Strip leading zeros unless it's just "0"
-                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                              field.onChange(
-                                cleanVal === ""
-                                  ? ""
-                                  : val.startsWith("0") && val.length > 1
-                                    ? Number(cleanVal)
-                                    : val,
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        {total > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1 font-medium">
-                            {percentage}% of Total Headcount
-                          </p>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-                <FormField
-                  control={form.control}
-                  name="beneficiary_plwd"
-                  render={({ field }) => {
-                    const total = Number(watchedValues.beneficiary_total) || 0;
-                    const plwd = Number(field.value) || 0;
-                    const percentage = total > 0 ? ((plwd / total) * 100).toFixed(1) : "0.0";
-                    return (
-                      <FormItem>
-                        <FormLabel>PLWD (People Living With Disabilities)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const cleanVal = val.replace(/^0+(?=[1-9])/, "");
-                              field.onChange(
-                                cleanVal === ""
-                                  ? ""
-                                  : val.startsWith("0") && val.length > 1
-                                    ? Number(cleanVal)
-                                    : val,
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        {total > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1 font-medium">
-                            {percentage}% of Total Headcount
-                          </p>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-              </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+
 
           {/* SECTION 8: Finalization */}
           <Card className="glass-card shadow-sm border-l-4 border-l-gray-400 -z-30">

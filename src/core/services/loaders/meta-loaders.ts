@@ -1,6 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { metaApi, State, LGA } from "../API/meta";
 
+export const STATES = [
+  "Anambra",
+  "Benue",
+  "Ebonyi",
+  "Enugu",
+  "Kogi",
+  "Nasarawa",
+  "Niger",
+  "Ogun",
+  "Taraba",
+];
+
 export function useStates() {
   return useQuery<State[]>({
     queryKey: ["meta", "states"],

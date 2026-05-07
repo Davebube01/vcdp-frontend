@@ -3,8 +3,9 @@ import { projectsApi } from "../API/projects";
 import { Project } from "../loaders/project-loaders";
 
 interface CreateProjectPayload {
-  ref_id: string;
+  activity_type_code: string;
   name: string;
+  vcdp_component?: string;
 }
 
 export function useCreateProjectAction() {
@@ -19,8 +20,9 @@ export function useCreateProjectAction() {
 }
 
 interface UpdateProjectPayload {
-  ref_id?: string;
+  activity_type_code?: string;
   name?: string;
+  vcdp_component?: string;
 }
 
 export function useUpdateProjectAction() {

@@ -3,8 +3,9 @@ import { projectsApi } from "../API/projects";
 
 export interface Project {
   id: string;
-  ref_id: string;
+  activity_type_code: string;
   name: string;
+  vcdp_component: string | null;
   created_by: string | null;
   created_at: string;
 }

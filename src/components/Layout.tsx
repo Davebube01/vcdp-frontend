@@ -37,9 +37,11 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "./ui/badge";
 import { useRecords } from "@/core/services/loaders/records-loaders";
+import { useCurrency } from "@/core/providers/CurrencyProvider";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const { displayCurrency, setDisplayCurrency } = useCurrency();
 
   const { user } = useAuth();
   const isNationalAdmin = user?.role?.toUpperCase() === "NATIONAL_ADMIN";
@@ -53,7 +55,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { label: "Submissions", icon: Table, href: "/submissions" },
     { label: "New Submission", icon: PlusCircle, href: "/submissions/new" },
-    { label: "Projects", icon: FolderSearch, href: "/projects" },
+    { label: "Project Framework", icon: FolderSearch, href: "/projects" },
     { label: "Documents", icon: FolderSearch, href: "/documents" },
     ...(user?.role?.toUpperCase() === "NATIONAL_ADMIN"
       ? [
@@ -162,7 +164,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset className="flex flex-col flex-1 ">
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-x-hidden">
           {/* Header */}
           <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-background/50 backdrop-blur-sm sticky top-0 z-50">
             <div className="flex items-center gap-4">
@@ -185,6 +187,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-primary border-primary/20 hover:bg-primary/5 hidden sm:flex"
+                  >
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Currency: {displayCurrency}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Select Display Currency</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setDisplayCurrency("USD")}>
+                    US Dollar ($)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDisplayCurrency("NGN")}>
+                    Nigerian Naira (₦)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
                     variant="ghost"
                     size="sm"
                     className="gap-2 text-muted-foreground hidden sm:flex"
@@ -203,7 +229,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto p-4 md:p-8 bg-background">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 bg-background">
             <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {children}
             </div>

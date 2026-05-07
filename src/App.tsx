@@ -17,6 +17,7 @@ import Users from "@/pages/users";
 import { InsightProvider } from "@/lib/store";
 import { AuthProvider } from "./core/providers/AuthProvider";
 import PendingSubmissions from "./pages/records/pending";
+import { CurrencyProvider } from "./core/providers/CurrencyProvider";
 
 function Router() {
   return (
@@ -51,12 +52,14 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
+          <CurrencyProvider>
           <InsightProvider>
             <TooltipProvider>
               <Router />
               <Toaster />
             </TooltipProvider>
           </InsightProvider>
+          </CurrencyProvider>
         </QueryClientProvider>
       </AuthProvider>
     </BrowserRouter>

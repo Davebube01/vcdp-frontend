@@ -8,22 +8,33 @@ export type Transaction = {
   fy_awarded: number;
   fy_completed: number;
   programme_phase: string;
-  fiscal_quarter: string;
+  fiscal_quarter: string[];
   vcdp_component: string[];
   vcdp_sub_components: string[];
   state: string;
   lgas: string[];
   threeFS_primary: string[];
   threeFS_sub_components: string[];
+  cofog_divisions: string[];
+  cofog_groups: string[];
   cofog_code: string;
   funding_sources: string[];
+  sub_funding_sources: string[];
   expenditure_fgn: number;
   expenditure_state: number;
   expenditure_ifad: number;
+  expenditure_ifad_loan: number;
+  expenditure_ifad_grant: number;
   expenditure_oof: number;
   expenditure_beneficiary: number;
   expenditure_other: number;
+  expenditure_private_sector: number;
+  expenditure_value_chain: number;
   expenditure_total: number;
+  expenditure_total_reported: number;
+  sub_funding_oof_text?: string;
+  sub_funding_private_text?: string;
+  sub_funding_value_chain_text?: string;
   beneficiary_categories: string[];
   beneficiary_total: number;
   beneficiary_male: number;
@@ -33,7 +44,16 @@ export type Transaction = {
   beneficiary_female_percentage: number;
   beneficiary_youth_percentage: number;
   beneficiary_plwd: number;
+  unit: string;
+  executing_agency: string;
+  institution_code: string;
+  activity_type_code?: string;
+  record_type: "Actual" | "Budget";
+  currency: "USD" | "NGN";
+  exchange_rate: number;
+  quarterly_beneficiary_data?: Record<string, { total: number; male: number; female: number; youth: number; plwd: number }>;
   value_chain_segments: string[];
+  value_chain_segments_other?: string;
   climate_flag: "Yes" | "No";
   data_source: string[];
   supporting_documents: string[];
@@ -62,22 +82,30 @@ const generateMockData = (): Transaction[] => {
       fy_awarded: 2023,
       fy_completed: 2024,
       programme_phase: "2nd AF",
-      fiscal_quarter: "Q2",
+      fiscal_quarter: ["Q2"],
       vcdp_component: [components[Math.floor(Math.random() * components.length)]],
       vcdp_sub_components: ["Market Infrastructure"],
       state: states[Math.floor(Math.random() * states.length)],
       lgas: ["Sample LGA"],
       threeFS_primary: ["1. Food Production"],
       threeFS_sub_components: ["1.1 Crop production"],
+      cofog_divisions: ["Economic Affairs"],
+      cofog_groups: ["Agriculture, forestry, fishing and hunting"],
       cofog_code: "04.2.1",
       funding_sources: ["Domestic", "International"],
+      sub_funding_sources: ["FGN counterpart funding"],
       expenditure_fgn: fgn,
       expenditure_state: 0,
       expenditure_ifad: ifad,
+      expenditure_ifad_loan: ifad * 0.8,
+      expenditure_ifad_grant: ifad * 0.2,
       expenditure_oof: 0,
       expenditure_beneficiary: 0,
       expenditure_other: 0,
+      expenditure_private_sector: 0,
+      expenditure_value_chain: 0,
       expenditure_total: total,
+      expenditure_total_reported: total,
       beneficiary_categories: ["Smallholder Farmers"],
       beneficiary_total: 100,
       beneficiary_male: 60,
@@ -87,6 +115,12 @@ const generateMockData = (): Transaction[] => {
       beneficiary_female_percentage: 40,
       beneficiary_youth_percentage: 30,
       beneficiary_plwd: 5,
+      unit: "Person",
+      executing_agency: "SPMU",
+      institution_code: "SPMU",
+      record_type: "Actual" as const,
+      currency: "USD" as const,
+      exchange_rate: 1.0,
       value_chain_segments: ["Production"],
       climate_flag: "Yes",
       data_source: ["Monthly Progress Report"],

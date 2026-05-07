@@ -51,12 +51,18 @@ import {
 import { toast } from "sonner";
 
 const DATA_SOURCE_OPTIONS = [
-  "Financial report",
-  "Audit report",
-  "Procurement record",
-  "Beneficiary database",
-  "AWPB excerpts",
-  "Bank statements",
+  "Administrative documents (HR/Training reports)",
+  "Audit documents (Internal audit reports)",
+  "Financial documents (Bank statements, Invoices, SEOs, Memos)",
+  "Procurement: Goods",
+  "Procurement: Works",
+  "Procurement: Consulting services",
+  "Inventory documents (Asset registers, etc.)",
+  "M&E documents (AWPB, Studies, Supervision reports)",
+  "Correspondence",
+  "Beneficiary data",
+  "Technical reports",
+  "Annual reports",
   "Geographic/location data",
 ];
 

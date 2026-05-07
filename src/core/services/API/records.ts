@@ -45,4 +45,11 @@ export const recordsApi = {
     const prefix = queryString ? `${queryString}&` : "";
     return `${baseUrl}/api/records/export/excel?${prefix}token=${token}`;
   },
+  exportCsv: (params: URLSearchParams) => {
+    const token = localStorage.getItem("auth_token");
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    const queryString = params.toString();
+    const prefix = queryString ? `${queryString}&` : "";
+    return `${baseUrl}/api/records/export/csv?${prefix}token=${token}`;
+  },
 };
