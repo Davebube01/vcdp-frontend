@@ -70,7 +70,8 @@ export function BulkUploadDialog() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch("/api/records/bulk-upload", {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await fetch(`${baseUrl}/api/records/bulk-upload`, {
         method: "POST",
         headers,
         body: formData,
