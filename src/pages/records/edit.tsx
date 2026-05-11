@@ -67,7 +67,9 @@ import { Separator } from "@/components/ui/separator";
 const formSchema = z.object({
   ref_id: z.string().optional(),
   project_name: z.string().min(1, "Activity Name is required"),
+  activity_name: z.string().optional(),
   activity_type_code: z.string().optional(),
+  category_costcode: z.string().optional(),
   commodity: z.array(z.string()).min(1, "At least one commodity required"),
   fy_awarded: z.string().min(1, "FY Awarded is required"),
   fy_completed: z.string().min(1, "FY Completed is required"),
@@ -260,6 +262,8 @@ export default function EditRecord() {
       executing_agency: "",
       institution_code: "",
       activity_type_code: "",
+      activity_name: "",
+      category_costcode: "",
       currency: "USD",
       status: "PENDING",
       cofog_code: "",
@@ -598,6 +602,32 @@ export default function EditRecord() {
                                     <FormLabel>Activity Name <span className="text-red-500">*</span></FormLabel>
                                     <FormControl>
                                         <Input placeholder="Activity Name" {...field} className="bg-white" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="activity_name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Activity Name (Short)</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Market linkages facilitation" {...field} className="bg-white" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="category_costcode"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Category / Costcode</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Training, technical assistance..." {...field} className="bg-white" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

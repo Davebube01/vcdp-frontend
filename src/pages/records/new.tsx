@@ -68,7 +68,9 @@ const formSchema = z
   .object({
     ref_id: z.string().optional(),
     project_name: z.string().min(1, "Activity Name is required"),
+    activity_name: z.string().optional(),
     activity_type_code: z.string().optional(),
+    category_costcode: z.string().optional(),
     commodity: z.array(z.string()).min(1, "At least one commodity required"),
     fy_awarded: z.string().min(1, "FY Awarded is required"),
     fy_completed: z.string().min(1, "FY Completed is required"),
@@ -201,7 +203,9 @@ export default function NewRecord() {
     defaultValues: {
       ref_id: "",
       project_name: "",
+      activity_name: "",
       activity_type_code: "",
+      category_costcode: "",
       commodity: [],
       fy_awarded: "",
       fy_completed: "",
@@ -646,6 +650,42 @@ export default function NewRecord() {
                   )}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="activity_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Activity Name (Short)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Market linkages facilitation"
+                          {...field}
+                          className="bg-white"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category_costcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category / Costcode</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Training, technical assistance..."
+                          {...field}
+                          className="bg-white"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="commodity"
@@ -902,7 +942,17 @@ export default function NewRecord() {
                         <MultiSelect
                           options={vcdpMeta ? Object.keys(vcdpMeta) : []}
                           selected={field.value}
-                          onChange={field.onChange}
+                          onChange={(vals) => {
+                            field.onChange(vals);
+                            const currentSubs = form.getValues("vcdp_sub_components");
+                            const newAllowed = vals.flatMap(
+                              (c) => (vcdpMeta as Record<string, string[]>)?.[c] || []
+                            );
+                            form.setValue(
+                              "vcdp_sub_components",
+                              currentSubs.filter((s) => newAllowed.includes(s))
+                            );
+                          }}
                           placeholder="Select Component"
                         />
                       </FormControl>
@@ -942,7 +992,17 @@ export default function NewRecord() {
                         <MultiSelect
                           options={threeFsMeta ? Object.keys(threeFsMeta) : []}
                           selected={field.value}
-                          onChange={field.onChange}
+                          onChange={(vals) => {
+                            field.onChange(vals);
+                            const currentSubs = form.getValues("threeFS_sub_components");
+                            const newAllowed = vals.flatMap(
+                              (p) => (threeFsMeta as Record<string, string[]>)?.[p] || []
+                            );
+                            form.setValue(
+                              "threeFS_sub_components",
+                              currentSubs.filter((s) => newAllowed.includes(s))
+                            );
+                          }}
                           placeholder="Select Primary 3FS"
                         />
                       </FormControl>
@@ -1113,7 +1173,17 @@ export default function NewRecord() {
                         <MultiSelect
                           options={fundMeta ? Object.keys(fundMeta) : []}
                           selected={field.value}
-                          onChange={field.onChange}
+                          onChange={(vals) => {
+                            field.onChange(vals);
+                            const currentSubs = form.getValues("sub_funding_sources");
+                            const newAllowed = vals.flatMap(
+                              (f) => (fundMeta as Record<string, string[]>)?.[f] || []
+                            );
+                            form.setValue(
+                              "sub_funding_sources",
+                              currentSubs.filter((s) => newAllowed.includes(s))
+                            );
+                          }}
                         />
                       </FormControl>
                       <FormMessage />

@@ -4,6 +4,8 @@ export type Transaction = {
   id: string;
   ref_id: string;
   project_name: string;
+  activity_name?: string;
+  category_costcode?: string;
   commodity: string[];
   fy_awarded: number;
   fy_completed: number;

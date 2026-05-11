@@ -52,4 +52,9 @@ export const recordsApi = {
     const prefix = queryString ? `${queryString}&` : "";
     return `${baseUrl}/api/records/export/csv?${prefix}token=${token}`;
   },
+  downloadTemplate: () => {
+    const token = localStorage.getItem("auth_token");
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    return `${baseUrl}/api/records/bulk-upload/template?token=${token}`;
+  },
 };

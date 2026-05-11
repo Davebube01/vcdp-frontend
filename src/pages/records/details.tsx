@@ -157,6 +157,25 @@ export default function RecordDetails() {
             <p className="text-muted-foreground font-medium">
               {record.project_name}
             </p>
+            {(record.activity_name || record.activity_type_code || record.category_costcode) && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {record.activity_type_code && (
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    Code: {record.activity_type_code}
+                  </Badge>
+                )}
+                {record.activity_name && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {record.activity_name}
+                  </Badge>
+                )}
+                {record.category_costcode && (
+                  <Badge className="bg-violet-100 text-violet-800 border-violet-200 text-[10px]">
+                    {record.category_costcode}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -363,6 +382,17 @@ export default function RecordDetails() {
                     </div>
                   </div>
                 </div>
+
+                <div className="flex justify-between items-center py-2 border-t">
+                  <span className="text-sm text-muted-foreground font-medium">Currency</span>
+                  <span className="font-mono font-bold">{record.currency || "NGN"}</span>
+                </div>
+                {record.currency === "NGN" && (
+                  <div className="flex justify-between items-center py-2 border-b border-dashed">
+                    <span className="text-sm text-muted-foreground font-medium">Exchange Rate (vs USD)</span>
+                    <span className="font-mono font-bold">{record.exchange_rate ?? 1}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -459,6 +489,26 @@ export default function RecordDetails() {
                   <p className="font-mono text-xl font-bold bg-muted w-fit px-3 py-1 rounded-lg border">
                     {record.cofog_code || "N/A"}
                   </p>
+                  {Array.isArray(record.cofog_divisions) && record.cofog_divisions.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-muted-foreground mb-1">Division(s)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {record.cofog_divisions.map((d: string) => (
+                          <Badge key={d} variant="outline" className="text-[10px]">{d}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {Array.isArray(record.cofog_groups) && record.cofog_groups.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">Group(s)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {record.cofog_groups.map((g: string) => (
+                          <Badge key={g} variant="outline" className="text-[10px] border-slate-300">{g}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 rounded-xl border bg-slate-50 relative overflow-hidden">
                   <CloudSun
@@ -521,6 +571,25 @@ export default function RecordDetails() {
                     </Badge>
                   )) : <Badge variant="outline">{record.lgas || "N/A"}</Badge>}
                 </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                  Funding Sources
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.isArray(record.funding_sources) && record.funding_sources.length > 0
+                    ? record.funding_sources.map((f: string) => (
+                        <Badge key={f} variant="secondary" className="text-[10px]">{f}</Badge>
+                      ))
+                    : <span className="text-xs text-muted-foreground">N/A</span>}
+                </div>
+                {Array.isArray(record.sub_funding_sources) && record.sub_funding_sources.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {record.sub_funding_sources.map((sf: string) => (
+                      <Badge key={sf} variant="outline" className="text-[10px] text-muted-foreground">{sf}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
@@ -580,6 +649,20 @@ export default function RecordDetails() {
                     <p className="text-[10px] font-bold text-muted-foreground">Youth %</p>
                     <p className="text-lg font-bold">{record.beneficiary_youth_percentage ?? "0.0"}%</p>
                   </div>
+                  <div className="border-l-2 border-rose-200 pl-3">
+                    <p className="text-[10px] font-bold text-muted-foreground">PLWD</p>
+                    <p className="text-lg font-bold">{record.beneficiary_plwd ?? 0}</p>
+                  </div>
+                  {Array.isArray(record.beneficiary_categories) && record.beneficiary_categories.length > 0 && (
+                    <div className="col-span-2 mt-2 pt-2 border-t">
+                      <p className="text-[10px] font-bold text-muted-foreground mb-1">Beneficiary Categories</p>
+                      <div className="flex flex-wrap gap-1">
+                        {record.beneficiary_categories.map((cat: string) => (
+                          <Badge key={cat} variant="outline" className="text-[10px]">{cat}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -625,6 +708,18 @@ export default function RecordDetails() {
                     {typeof record.supporting_documents === 'string' ? record.supporting_documents : "No documents attached."}
                   </div>
                 )}
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                  Data Sources
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.isArray(record.data_source) && record.data_source.length > 0
+                    ? record.data_source.map((d: string) => (
+                        <Badge key={d} variant="secondary" className="text-[10px]">{d}</Badge>
+                      ))
+                    : <span className="text-xs text-muted-foreground">N/A</span>}
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-2">
