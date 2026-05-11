@@ -63,6 +63,7 @@ import {
 import { Check, ChevronsUpDown, Loader2, Save, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/providers/AuthProvider";
+import { BulkUploadDialog } from "./BulkUploadDialog";
 
 const formSchema = z
   .object({
@@ -533,12 +534,10 @@ export default function NewRecord() {
           <h2 className="text-3xl font-display font-bold text-primary tracking-tight">
             New 3FS Record
           </h2>
-          {/* <p className="text-muted-foreground mt-1 font-medium italic">
-            Project Year
-          </p> */}
         </div>
-        <div className="hidden md:block">
-          <FileCheck className="w-12 h-12 text-primary/20" />
+        <div className="flex items-center gap-3">
+          <BulkUploadDialog />
+          <FileCheck className="w-12 h-12 text-primary/20 hidden md:block" />
         </div>
       </div>
 

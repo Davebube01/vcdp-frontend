@@ -61,7 +61,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/core/providers/AuthProvider";
-import { BulkUploadDialog } from "./BulkUploadDialog";
+
 
 import { useCurrency } from "@/core/providers/CurrencyProvider";
 
@@ -302,7 +302,7 @@ export default function Records() {
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export Excel</span>
           </Button>
-          <BulkUploadDialog />
+
           <Button asChild className="gap-2 shadow-lg shadow-primary/20">
             <Link to="/submissions/new">
               <Plus className="w-4 h-4" />
