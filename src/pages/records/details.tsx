@@ -114,8 +114,8 @@ export default function RecordDetails() {
           </div>
           {user?.role?.toUpperCase() === "STATE_COORDINATOR" && (
             <Button className="bg-rose-600 hover:bg-rose-700 text-white shrink-0" asChild>
-              <Link to={`/submissions/${id}/edit`}>
-                Edit & Fix Submission
+              <Link to={`/activities/${id}/edit`}>
+                Edit & Fix Activity
               </Link>
             </Button>
           )}
@@ -127,7 +127,7 @@ export default function RecordDetails() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/submissions")}
+            onClick={() => navigate("/activities")}
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -263,7 +263,7 @@ export default function RecordDetails() {
             className="gap-2"
             asChild
           >
-            <Link to={`/submissions/${id}/edit`}>
+            <Link to={`/activities/${id}/edit`}>
               <Pencil className="w-4 h-4" /> Edit
             </Link>
           </Button>

@@ -29,6 +29,17 @@ export const recordsApi = {
     apiRequest<void>(`/api/records/${id}`, {
       method: "DELETE",
     }),
+  
+  bulkDelete: (ids: string[]) =>
+    apiRequest<void>("/api/records/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ record_ids: ids }),
+    }),
+
+  deleteAll: () =>
+    apiRequest<void>("/api/records/all/clear", {
+      method: "DELETE",
+    }),
 
   updateStatus: (id: string, status: string, reason?: string) =>
     apiRequest<Transaction>(

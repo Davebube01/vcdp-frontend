@@ -30,11 +30,11 @@ function Router() {
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/submissions" element={<Records />} />
-              <Route path="/submissions/new" element={<NewRecord />} />
-              <Route path="/submissions/pending" element={<PendingSubmissions />} />
-              <Route path="/submissions/:id" element={<RecordDetails />} />
-              <Route path="/submissions/:id/edit" element={<EditRecord />} />
+              <Route path="/activities" element={<Records />} />
+              <Route path="/activities/new" element={<NewRecord />} />
+              <Route path="/activities/pending" element={<PendingSubmissions />} />
+              <Route path="/activities/:id" element={<RecordDetails />} />
+              <Route path="/activities/:id/edit" element={<EditRecord />} />
               <Route path="/documents" element={<Documents />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />

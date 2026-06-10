@@ -115,8 +115,8 @@ export default function PendingSubmissions() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" asChild title="Review Submission">
-          <Link to={`/submissions/${row.original.id}`}>
+        <Button variant="ghost" size="icon" asChild title="Review Activity">
+          <Link to={`/activities/${row.original.id}`}>
             <ExternalLink className="w-4 h-4" />
           </Link>
         </Button>
@@ -142,7 +142,7 @@ export default function PendingSubmissions() {
               Pending Approvals
             </h2>
             <p className="text-muted-foreground mt-1">
-              Review and approve submissions from state coordinators.
+              Review and approve activity submissions from state coordinators.
             </p>
           </div>
         </div>
@@ -151,7 +151,7 @@ export default function PendingSubmissions() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search Pending Submissions..."
+          placeholder="Search Pending Activity Submissions..."
           className="pl-9 h-11 bg-card shadow-sm border-slate-200"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

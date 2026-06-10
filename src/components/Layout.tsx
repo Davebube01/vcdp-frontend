@@ -53,16 +53,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pendingCount = pendingData?.total || 0;
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "Submissions", icon: Table, href: "/submissions" },
-    { label: "New Submission", icon: PlusCircle, href: "/submissions/new" },
+    { label: "Submitted Activities", icon: Table, href: "/activities" },
+    { label: "New Activity", icon: PlusCircle, href: "/activities/new" },
     { label: "Project Framework", icon: FolderSearch, href: "/projects" },
     { label: "Documents", icon: FolderSearch, href: "/documents" },
     ...(user?.role?.toUpperCase() === "NATIONAL_ADMIN"
       ? [
           {
-            label: "Pending Documents",
+            label: "Pending Activities",
             icon: ClipboardCheck,
-            href: "/submissions/pending",
+            href: "/activities/pending",
           },
           { label: "Users", icon: UsersIcon, href: "/users" },
         ]
@@ -71,12 +71,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isActiveLink = (href: string) => {
     if (href === "/") return location.pathname === "/";
-    if (href === "/submissions") {
+    if (href === "/activities") {
       return (
-        location.pathname === "/submissions" ||
-        (location.pathname.startsWith("/submissions/") &&
-          !location.pathname.startsWith("/submissions/new") &&
-          !location.pathname.startsWith("/submissions/pending"))
+        location.pathname === "/activities" ||
+        (location.pathname.startsWith("/activities/") &&
+          !location.pathname.startsWith("/activities/new") &&
+          !location.pathname.startsWith("/activities/pending"))
       );
     }
     return location.pathname.startsWith(href);

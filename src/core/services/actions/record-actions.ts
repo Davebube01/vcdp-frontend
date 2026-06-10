@@ -59,3 +59,26 @@ export function useUpdateRecordStatusAction() {
     },
   });
 }
+export function useBulkDeleteRecordsAction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => recordsApi.bulkDelete(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] });
+    },
+  });
+}
+
+export function useDeleteAllRecordsAction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => recordsApi.deleteAll(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] });
+    },
+  });
+}

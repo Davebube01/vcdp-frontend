@@ -367,6 +367,16 @@ export default function EditRecord() {
     );
   }, [watchedValues.threeFS_primary, threeFsMeta]);
 
+  // Climate flag: auto-force ON when Component 5 is selected
+  const CLIMATE_COMPONENT = "Component 5: Climate Change and Natural Resources";
+  const isClimateForced = (watchedValues.threeFS_primary || []).includes(CLIMATE_COMPONENT);
+
+  useEffect(() => {
+    if (isClimateForced) {
+      form.setValue("climate_flag", true, { shouldDirty: true });
+    }
+  }, [isClimateForced, form]);
+
   const filteredSubFundingSources = useMemo(() => {
     const selectedFoundations = watchedValues.funding_sources || [];
     if (selectedFoundations.length === 0) return [];
@@ -473,7 +483,7 @@ export default function EditRecord() {
         title: "Record Updated",
         description: isNationalAdmin ? "Changes saved successfully." : "Record resubmitted for approval.",
       });
-      navigate(`/submissions/${id}`);
+      navigate(`/activities/${id}`);
     } catch (err) {
       toast({
         title: "Update Failed",
@@ -1583,26 +1593,59 @@ export default function EditRecord() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <FormField
-                        control={form.control}
-                        name="supporting_documents"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Supporting Documents</FormLabel>
-                                <FormControl>
-                                    <MultiSelect
-                                        options={availableDocuments}
-                                        selected={field.value}
-                                        onChange={field.onChange}
-                                        placeholder="Select Documents"
-                                        disabled={!watchedValues.state || !watchedValues.data_source?.length}
-                                    />
-                                </FormControl>
-                                <FormDescription>Only documents matching the selected data sources are shown.</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <div className="space-y-6">
+                        <FormField
+                            control={form.control}
+                            name="climate_flag"
+                            render={({ field }) => (
+                                <FormItem className="flex items-center justify-between rounded-lg border p-4 shadow-sm bg-emerald-50/50">
+                                    <div className="space-y-0.5">
+                                        <FormLabel className="text-base font-bold text-emerald-800">
+                                            Climate/Environment Flag
+                                            {isClimateForced && (
+                                                <span className="ml-2 text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">
+                                                    Auto-enabled
+                                                </span>
+                                            )}
+                                        </FormLabel>
+                                        <FormDescription>
+                                            {isClimateForced
+                                                ? "Automatically enabled because Component 5 (Climate Change & Natural Resources) is selected."
+                                                : "Does this project support climate adaptation, mitigation, or environmental sustainability activities?"}
+                                        </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                        <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                            disabled={isClimateForced}
+                                            className="data-[state=checked]:bg-emerald-600"
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="supporting_documents"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Supporting Documents</FormLabel>
+                                    <FormControl>
+                                        <MultiSelect
+                                            options={availableDocuments}
+                                            selected={field.value}
+                                            onChange={field.onChange}
+                                            placeholder="Select Documents"
+                                            disabled={!watchedValues.state || !watchedValues.data_source?.length}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>Only documents matching the selected data sources are shown.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                     <FormField
                         control={form.control}
                         name="classification_notes"

@@ -27,6 +27,8 @@ import {
   Search,
   Calendar,
   Pencil,
+  Trash2,
+  CheckSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -61,9 +63,22 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/core/providers/AuthProvider";
-
-
 import { useCurrency } from "@/core/providers/CurrencyProvider";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  useBulkDeleteRecordsAction,
+  useDeleteAllRecordsAction,
+} from "@/core/services/actions/record-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Records() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -161,8 +176,37 @@ export default function Records() {
   );
 
   const { data: recordsData, isLoading } = useRecords(queryParams);
+  const { mutate: bulkDelete } = useBulkDeleteRecordsAction();
+  const { mutate: deleteAll } = useDeleteAllRecordsAction();
+  const { toast } = useToast();
+
+  const [rowSelection, setRowSelection] = useState({});
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   const columns: ColumnDef<Transaction>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "ref_id",
       header: "Ref ID",
@@ -258,12 +302,12 @@ export default function Records() {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild title="View Details">
-            <Link to={`/submissions/${row.original.id}`}>
+            <Link to={`/activities/${row.original.id}`}>
               <ExternalLink className="w-4 h-4" />
             </Link>
           </Button>
           <Button variant="ghost" size="icon" asChild title="Edit Record" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-            <Link to={`/submissions/${row.original.id}/edit`}>
+            <Link to={`/activities/${row.original.id}/edit`}>
               <Pencil className="w-4 h-4" />
             </Link>
           </Button>
@@ -276,7 +320,40 @@ export default function Records() {
     data: recordsData?.items || [],
     columns,
     getCoreRowModel: getCoreRowModel(),
+    onRowSelectionChange: setRowSelection,
+    getPaginationRowModel: getPaginationRowModel(),
+    state: {
+      rowSelection,
+    },
   });
+
+  const selectedRows = table.getSelectedRowModel().rows;
+  const selectedIds = selectedRows.map((r) => r.original.id);
+
+  const handleBulkDelete = () => {
+    bulkDelete(selectedIds, {
+      onSuccess: () => {
+        setRowSelection({});
+        setShowBulkDeleteConfirm(false);
+        toast({
+          title: "Records Deleted",
+          description: `Successfully deleted ${selectedIds.length} records.`,
+        });
+      },
+    });
+  };
+
+  const handleDeleteAll = () => {
+    deleteAll(undefined, {
+      onSuccess: () => {
+        setShowDeleteAllConfirm(false);
+        toast({
+          title: "All Records Cleared",
+          description: "Every submission has been removed from the system.",
+        });
+      },
+    });
+  };
 
   const handleExport = () => {
     window.open(recordsApi.exportExcel(queryParams), "_blank");
@@ -299,9 +376,28 @@ export default function Records() {
             className="gap-2 shadow-sm"
             onClick={handleExport}
           >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Export Excel</span>
+            <Download className="w-4 h-4" /> Export
           </Button>
+
+          {isNationalAdmin && selectedIds.length > 0 && (
+            <Button
+              variant="destructive"
+              className="gap-2 shadow-sm animate-in fade-in slide-in-from-right-2"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+            >
+              <Trash2 className="w-4 h-4" /> Delete Selected ({selectedIds.length})
+            </Button>
+          )}
+
+          {isNationalAdmin && (
+            <Button
+              variant="outline"
+              className="gap-2 shadow-sm text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+              onClick={() => setShowDeleteAllConfirm(true)}
+            >
+              <CheckSquare className="w-4 h-4" /> Clear All Submissions
+            </Button>
+          )}
 
           <Button asChild className="gap-2 shadow-lg shadow-primary/20">
             <Link to="/submissions/new">
@@ -646,6 +742,42 @@ export default function Records() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete {selectedIds.length} selected activities. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-rose-600">DANGER: Delete ALL Submissions?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-900 font-medium">
+              This is a highly destructive action. You are about to wipe EVERY activity submission from the database.
+              <br /><br />
+              All progress, charts, and historical data will be cleared instantly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep my data</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-rose-600 text-white hover:bg-rose-700">
+              Yes, Clear Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

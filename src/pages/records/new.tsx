@@ -387,6 +387,16 @@ export default function NewRecord() {
     );
   }, [watchedValues.threeFS_primary, threeFsMeta]);
 
+  // Climate flag: auto-force ON when Component 5 is selected
+  const CLIMATE_COMPONENT = "Component 5: Climate Change and Natural Resources";
+  const isClimateForced = (watchedValues.threeFS_primary || []).includes(CLIMATE_COMPONENT);
+
+  useEffect(() => {
+    if (isClimateForced) {
+      form.setValue("climate_flag", true, { shouldDirty: true });
+    }
+  }, [isClimateForced, form]);
+
   // Logic: Filtered Sub-Funding Sources
   const filteredSubFundingSources = useMemo(() => {
     const selectedFoundations = watchedValues.funding_sources || [];
@@ -505,7 +515,7 @@ export default function NewRecord() {
           title: "Success",
           description: "Transaction record saved successfully.",
         });
-        navigate("/submissions");
+        navigate("/activities");
       },
       onError: (error: any) => {
         toast({
@@ -532,7 +542,7 @@ export default function NewRecord() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-display font-bold text-primary tracking-tight">
-            New 3FS Record
+            New Activity Record
           </h2>
         </div>
         <div className="flex items-center gap-3">
@@ -1985,15 +1995,23 @@ export default function NewRecord() {
                       <div className="space-y-0.5">
                         <FormLabel className="text-base font-bold text-emerald-800">
                           Climate/Environment Flag
+                          {isClimateForced && (
+                            <span className="ml-2 text-xs font-semibold bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">
+                              Auto-enabled
+                            </span>
+                          )}
                         </FormLabel>
                         <FormDescription>
-                          Does this project support climate adaptation, mitigation, or environmental sustainability activities?
+                          {isClimateForced
+                            ? "Automatically enabled because Component 5 (Climate Change & Natural Resources) is selected."
+                            : "Does this project support climate adaptation, mitigation, or environmental sustainability activities?"}
                         </FormDescription>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          disabled={isClimateForced}
                           className="data-[state=checked]:bg-emerald-600"
                         />
                       </FormControl>
@@ -2093,7 +2111,7 @@ export default function NewRecord() {
               <Button
                 variant="outline"
                 type="button"
-                onClick={() => navigate("/submissions")}
+                onClick={() => navigate("/activities")}
                 disabled={isSubmitting}
               >
                 Cancel

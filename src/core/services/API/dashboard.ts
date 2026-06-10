@@ -12,6 +12,7 @@ export interface DashboardMetrics {
     trend: { year: number; expenditure: number }[];
     state_performance: { name: string; value: number }[];
     funding_sources: { name: string; value: number }[];
+    commodities: { name: string; value: number }[];
   };
 }
 

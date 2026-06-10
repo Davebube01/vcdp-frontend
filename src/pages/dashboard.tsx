@@ -69,14 +69,35 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/core/providers/AuthProvider";
 
-const COLORS = [
-  "#0ea5e9",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
+// Distinct color palette for the 3FS pie chart (5 components)
+const PIE_COLORS = [
+  "#0ea5e9", // sky-500  – Component 1 Agricultural
+  "#10b981", // emerald  – Component 2 Infrastructure
+  "#f59e0b", // amber    – Component 3 Nutrition
+  "#ef4444", // red      – Component 4 Social Assistance
+  "#8b5cf6", // violet   – Component 5 Climate
 ];
+
+const COMMODITY_COLORS = [
+  "#0ea5e9", // Rice - Blue
+  "#10b981", // Cassava - Green
+  "#f59e0b", // Cross-cutting - Orange
+];
+// Normalise shorthand 3FS labels on the frontend (safety net for any cached data)
+const THREEFS_DISPLAY: Record<string, string> = {
+  "Component 1: Agricultural Development and Value Chains": "Agricultural Development",
+  "Component 2: Infrastructure for Food Systems": "Infrastructure",
+  "Component 3: Nutrition and Health": "Nutrition/Health",
+  "Component 4: Social Assistance": "Social Assistance",
+  "Component 5: Climate Change and Natural Resources": "Climate/Resources",
+  // shorthand fallbacks
+  "1. Food Production": "Agricultural Development",
+  "1. food production": "Agricultural Development",
+  "2. Food processing": "Infrastructure",
+  "3. Food social protection": "Nutrition/Health",
+  "4. Enabling environment": "Social Assistance",
+  "5. Governance": "Climate/Resources",
+};
 
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -167,6 +188,7 @@ export default function Dashboard() {
   }, [filters, isNationalAdmin, user?.state]);
 
   const { data: metrics, isLoading } = useDashboardMetrics(queryParams);
+  
 
   const handleExport = () => {
     const exportUrl = recordsApi.exportExcel(queryParams);
@@ -480,7 +502,7 @@ export default function Dashboard() {
         <Card className="glass-card shadow-sm group hover:border-orange-500/50 transition-colors text-slate-900">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-              Active States
+              States + NPMU
             </CardTitle>
             <div className="p-2 bg-orange-100 rounded-lg text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors">
               <Map className="h-4 w-4" />
@@ -541,7 +563,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" /> Expenditure Trend
-              (2013 - {new Date().getFullYear()})
+              ({filters.fy_awarded !== "all" ? filters.fy_awarded : `2013 - ${new Date().getFullYear()}`})
             </CardTitle>
             <CardDescription>
               Visualizing investment growth across all phases.
@@ -549,7 +571,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="h-[350px] pt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={metrics?.charts.trend}>
+              <LineChart data={metrics?.charts?.trend}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -615,23 +637,23 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={metrics?.charts.threefs.map(item => ({
-                    ...item,
-                    name: item.name.includes("Component 1") ? "Agricultural Development" :
-                          item.name.includes("Component 2") ? "Infrastructure" :
-                          item.name.includes("Component 3") ? "Nutrition/Health" :
-                          item.name.includes("Component 4") ? "Social Assistance" :
-                          item.name.includes("Component 5") ? "Climate/Resources" : item.name
-                  }))}
+                  data={metrics?.charts?.threefs
+                    ?.map(item => ({
+                      ...item,
+                      name: THREEFS_DISPLAY[item.name] || item.name,
+                    }))
+                    .filter(item => item.value > 0)}
                   innerRadius={80}
                   outerRadius={120}
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {metrics?.charts.threefs.map((entry, index) => (
+                  {metrics?.charts?.threefs
+                    ?.filter(item => item.value > 0)
+                    .map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
+                      fill={PIE_COLORS[index % PIE_COLORS.length]}
                     />
                   ))}
                 </Pie>
@@ -667,7 +689,7 @@ export default function Dashboard() {
           <CardContent className="h-[400px] pt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={metrics?.charts.state_performance}
+                data={metrics?.charts?.state_performance}
                 layout="vertical"
               >
                 <CartesianGrid
@@ -691,7 +713,7 @@ export default function Dashboard() {
                 />
                 <Bar
                   dataKey="value"
-                  fill="#f59e0b"
+                  fill="#94a3b8"
                   radius={[0, 4, 4, 0]}
                   barSize={20}
                 />
@@ -713,7 +735,7 @@ export default function Dashboard() {
           <CardContent className="h-[400px] flex items-center justify-center">
             <ResponsiveContainer width="100%" height="80%">
               <BarChart
-                data={metrics?.charts.funding_sources}
+                data={metrics?.charts?.funding_sources}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -741,6 +763,65 @@ export default function Dashboard() {
                   barSize={50}
                 />
               </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Commodity Breakdown (Donut) */}
+        <Card className="glass-card shadow-sm border-t-4 border-t-sky-500 lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold">
+                Commodity Value Chain Distribution
+              </CardTitle>
+              <CardDescription>
+                Expenditure split across core value chains.
+              </CardDescription>
+            </div>
+            <div className="text-right">
+              <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total Commodity Spent</div>
+              <div className="text-xl font-display font-bold text-sky-600">
+                {formatValue(
+                  metrics?.charts?.commodities?.reduce((acc: number, curr: any) => acc + curr.value, 0) || 0,
+                  "USD",
+                  true
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="h-[350px] flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={metrics?.charts?.commodities?.filter((item: any) => item.value > 0)}
+                  innerRadius={80}
+                  outerRadius={120}
+                  paddingAngle={5}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {metrics?.charts?.commodities?.filter((item: any) => item.value > 0).map((entry: any, index: number) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COMMODITY_COLORS[index % COMMODITY_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(val: number) => formatValue(val, "USD")}
+                />
+                <Legend
+                  layout="horizontal"
+                  align="center"
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  wrapperStyle={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    paddingTop: "20px",
+                  }}
+                />
+              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
